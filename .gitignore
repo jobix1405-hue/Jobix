@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# =========================================
+# Custom Jobix Local Tools & AI Snapshots
+# =========================================
+# اسکریپت‌ها و خروجی‌های مربوط به هوش مصنوعی که نباید پوش شوند
+generate_snapshot.py
+run_snapshot.bat
+project_snapshot.txt
+
+# Strategic Documents
+JOBIX_MASTER_PLAN.md
+PHASE*.md
