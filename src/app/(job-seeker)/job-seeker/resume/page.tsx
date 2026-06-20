@@ -1,0 +1,262 @@
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { User, Briefcase, GraduationCap, Code, CheckCircle2, Save } from "lucide-react";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
+import { Button } from "@/components/ui/Button";
+
+// ۱. تعریف قوانین اعتبارسنجی رزومه
+const resumeSchema = z.object({
+  firstName: z.string().min(2, "نام باید حداقل ۲ حرف باشد"),
+  lastName: z.string().min(2, "نام خانوادگی باید حداقل ۲ حرف باشد"),
+  jobTitle: z.string().min(3, "عنوان تخصصی خود را وارد کنید (مثلاً: برنامه‌نویس)"),
+  aboutMe: z.string().max(500, "توضیحات نمی‌تواند بیشتر از ۵۰۰ حرف باشد").optional(),
+  
+  university: z.string().optional(),
+  degree: z.string().optional(),
+  
+  lastCompany: z.string().optional(),
+  lastPosition: z.string().optional(),
+  
+  skills: z.string().optional(),
+});
+
+type ResumeFormValues = z.infer<typeof resumeSchema>;
+
+export default function ResumeBuilderPage() {
+  const [activeTab, setActiveTab] = useState<"personal" | "experience" | "skills">("personal");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // ۲. اتصال فرم به Zod
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResumeFormValues>({
+    resolver: zodResolver(resumeSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      jobTitle: "",
+      aboutMe: "",
+      university: "",
+      degree: "",
+      lastCompany: "",
+      lastPosition: "",
+      skills: "",
+    }
+  });
+
+  // ۳. هندل کردن ذخیره رزومه
+  const onSubmit = (data: ResumeFormValues) => {
+    setIsSubmitting(true);
+    
+    // اینجا دیتای رزومه رو برای ارسال به دیتابیس (Supabase) آماده می‌کنیم
+    console.log("دیتای رزومه کارجو:", data);
+    
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setIsSuccess(true);
+      
+      // پیام موفقیت بعد از ۳ ثانیه محو میشه
+      setTimeout(() => setIsSuccess(false), 3000);
+    }, 1500);
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl animate-in fade-in duration-500">
+      
+      {/* هدر صفحه */}
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">رزومه من</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            پروفایل و رزومه خود را تکمیل کنید تا شانس استخدام شما افزایش یابد.
+          </p>
+        </div>
+        
+        {/* پیام موفقیت ذخیره */}
+        {isSuccess && (
+          <div className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-2 text-sm font-medium text-green-700 border border-green-100 animate-in slide-in-from-left-4">
+            <CheckCircle2 className="h-5 w-5" />
+            تغییرات با موفقیت ذخیره شد
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        
+        {/* =======================
+            تب‌های ناوبری فرم
+        ======================= */}
+        <div className="flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab("personal")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${
+              activeTab === "personal" 
+                ? "bg-white text-primary shadow-sm" 
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+            }`}
+          >
+            <User className="h-4 w-4" />
+            <span className="hidden sm:inline">اطلاعات فردی</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setActiveTab("experience")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${
+              activeTab === "experience" 
+                ? "bg-white text-primary shadow-sm" 
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+            }`}
+          >
+            <Briefcase className="h-4 w-4" />
+            <span className="hidden sm:inline">سوابق و تحصيلات</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("skills")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${
+              activeTab === "skills" 
+                ? "bg-white text-primary shadow-sm" 
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+            }`}
+          >
+            <Code className="h-4 w-4" />
+            <span className="hidden sm:inline">مهارت‌ها</span>
+          </button>
+        </div>
+
+        {/* =======================
+            محتوای تب‌ها
+        ======================= */}
+        <div className="rounded-3xl border border-slate-100 bg-white p-6 sm:p-8 shadow-sm">
+          
+          {/* تب ۱: اطلاعات فردی */}
+          <div className={activeTab === "personal" ? "block space-y-6" : "hidden"}>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <Input
+                label="نام *"
+                placeholder="مثال: علی"
+                {...register("firstName")}
+                error={errors.firstName?.message}
+              />
+              <Input
+                label="نام خانوادگی *"
+                placeholder="مثال: محمدی"
+                {...register("lastName")}
+                error={errors.lastName?.message}
+              />
+            </div>
+            
+            <Input
+              label="عنوان تخصصی (Job Title) *"
+              placeholder="مثال: توسعه‌دهنده فرانت‌اند، مدیر فروش..."
+              {...register("jobTitle")}
+              error={errors.jobTitle?.message}
+            />
+
+            <Textarea
+              label="درباره من (خلاصه رزومه)"
+              placeholder="یک پاراگراف کوتاه در مورد اشتیاق، تجربه و اهداف شغلی خود بنویسید..."
+              className="min-h-[150px]"
+              {...register("aboutMe")}
+              error={errors.aboutMe?.message}
+            />
+          </div>
+
+          {/* تب ۲: سوابق و تحصیلات */}
+          <div className={activeTab === "experience" ? "block space-y-8" : "hidden"}>
+            
+            {/* بخش سوابق شغلی */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                <Briefcase className="h-5 w-5 text-secondary" />
+                <h3 className="font-bold text-slate-800">آخرین سابقه شغلی</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <Input
+                  label="نام شرکت"
+                  placeholder="مثال: اسنپ"
+                  {...register("lastCompany")}
+                />
+                <Input
+                  label="سمت شغلی"
+                  placeholder="مثال: طراح محصول"
+                  {...register("lastPosition")}
+                />
+              </div>
+            </div>
+
+            {/* بخش تحصیلات */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                <GraduationCap className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-slate-800">آخرین مدرک تحصیلی</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <Input
+                  label="نام دانشگاه / موسسه"
+                  placeholder="مثال: دانشگاه تهران"
+                  {...register("university")}
+                />
+                <Select
+                  label="مقطع تحصیلی"
+                  options={[
+                    { value: "diploma", label: "دیپلم" },
+                    { value: "bachelor", label: "کارشناسی" },
+                    { value: "master", label: "کارشناسی ارشد" },
+                    { value: "phd", label: "دکترا" },
+                  ]}
+                  {...register("degree")}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* تب ۳: مهارت‌ها */}
+          <div className={activeTab === "skills" ? "block space-y-6" : "hidden"}>
+            <div className="rounded-xl bg-blue-50 p-4 mb-6 border border-blue-100">
+              <p className="text-sm text-blue-800">
+                مهارت‌های تخصصی خود را با کاما (,) از هم جدا کنید. این کلمات کلیدی به سیستم هوشمند جابیکس کمک می‌کند تا آگهی‌های مرتبط را به شما پیشنهاد دهد.
+              </p>
+            </div>
+            
+            <Textarea
+              label="مهارت‌های تخصصی و نرم"
+              placeholder="مثال: React, Next.js, کار تیمی, حل مسئله, فن بیان"
+              className="min-h-[150px]"
+              {...register("skills")}
+            />
+          </div>
+
+        </div>
+
+        {/* =======================
+            دکمه ذخیره نهایی
+        ======================= */}
+        <div className="flex items-center justify-end gap-4 pt-4">
+          <Button 
+            type="submit" 
+            size="lg" 
+            className="rounded-xl px-8"
+            isLoading={isSubmitting}
+          >
+            <Save className="ml-2 h-5 w-5" />
+            ذخیره و بروزرسانی رزومه
+          </Button>
+        </div>
+
+      </form>
+    </div>
+  );
+}

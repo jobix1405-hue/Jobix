@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+@theme {
+  /* رنگ‌های سازمانی جابیکس */
+  --color-primary: #1e3a8a; /* سرمه‌ای - Navy Blue */
+  --color-primary-hover: #1e40af;
+  --color-secondary: #f97316; /* نارنجی - Orange */
+  --color-secondary-hover: #ea580c;
+  
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+
+  /* تعریف فونت */
+  --font-vazirmatn: var(--font-vazirmatn), sans-serif;
+}
+
+@layer base {
+  /* تنظیم اعداد فارسی و استایل پایه */
+  * {
+    -moz-font-feature-settings: "ss02";
+    -webkit-font-feature-settings: "ss02";
+    font-feature-settings: "ss02"; 
+  }
+  
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-vazirmatn);
+  }
+}
