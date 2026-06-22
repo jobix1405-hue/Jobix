@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useStore } from "@/store/useStore";
+import { createClient } from "@/lib/supabase";
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -10,7 +11,10 @@ import {
   MessageSquare, 
   Settings, 
   LogOut, 
-  X 
+  X,
+  Bookmark, 
+  ShieldCheck, 
+  Building 
 } from "lucide-react";
 
 interface SidebarItem {
@@ -19,30 +23,53 @@ interface SidebarItem {
   icon: React.ElementType;
 }
 
+// 🔥 اضافه شدن نقش admin به تایپ‌ها
 interface SidebarProps {
-  role: "employer" | "job-seeker";
+  role: "employer" | "job-seeker" | "admin"; 
 }
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
-  const { isSidebarOpen, toggleSidebar } = useStore();
+  const router = useRouter();
+  const supabase = createClient();
+  const { isSidebarOpen, toggleSidebar, setUser } = useStore();
 
-  // لینک‌های اختصاصی بر اساس نقش کاربر
-  const links: SidebarItem[] = role === "employer" 
-    ? [
-        { name: "پیشخوان", href: "/employer", icon: LayoutDashboard },
-        { name: "آگهی‌های من", href: "/employer/jobs", icon: Briefcase },
-        { name: "رزومه‌های دریافتی", href: "/employer/applications", icon: Users },
-        { name: "پیام‌ها", href: "/employer/messages", icon: MessageSquare },
-        { name: "تنظیمات شرکت", href: "/employer/settings", icon: Settings },
-      ]
-    : [
-        { name: "پیشخوان", href: "/job-seeker", icon: LayoutDashboard },
-        { name: "رزومه من", href: "/job-seeker/resume", icon: Briefcase },
-        { name: "درخواست‌های من", href: "/job-seeker/applications", icon: Users },
-        { name: "پیام‌ها", href: "/job-seeker/messages", icon: MessageSquare },
-        { name: "تنظیمات حساب", href: "/job-seeker/settings", icon: Settings },
-      ];
+  // تابع خروج از حساب کاربری
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    router.push("/login");
+    router.refresh();
+  };
+
+  // 🔥 تنظیم لینک‌های اختصاصی بر اساس هر سه نقش
+  let links: SidebarItem[] = [];
+  
+  if (role === "admin") {
+    links = [
+      { name: "پیشخوان مدیریت", href: "/admin", icon: LayoutDashboard },
+      { name: "مدیریت شرکت‌ها", href: "/admin/companies", icon: ShieldCheck },
+      { name: "مدیریت آگهی‌ها", href: "/admin/jobs", icon: Briefcase },
+      { name: "کاربران پلتفرم", href: "/admin/users", icon: Users },
+    ];
+  } else if (role === "employer") {
+    links = [
+      { name: "پیشخوان", href: "/employer", icon: LayoutDashboard },
+      { name: "آگهی‌های من", href: "/employer/jobs", icon: Briefcase },
+      { name: "رزومه‌های دریافتی", href: "/employer/applications", icon: Users },
+      { name: "پیام‌ها", href: "/employer/messages", icon: MessageSquare },
+      { name: "تنظیمات شرکت", href: "/employer/settings", icon: Settings },
+    ];
+  } else {
+    links = [
+      { name: "پیشخوان", href: "/job-seeker", icon: LayoutDashboard },
+      { name: "رزومه من", href: "/job-seeker/resume", icon: Briefcase },
+      { name: "آگهی‌های نشان‌شده", href: "/job-seeker/saved-jobs", icon: Bookmark },
+      { name: "درخواست‌های من", href: "/job-seeker/applications", icon: Users },
+      { name: "پیام‌ها", href: "/job-seeker/messages", icon: MessageSquare },
+      { name: "تنظیمات حساب", href: "/job-seeker/settings", icon: Settings },
+    ];
+  }
 
   return (
     <>
@@ -63,7 +90,7 @@ export function Sidebar({ role }: SidebarProps) {
         {/* هدر سایدبار */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-slate-100">
           <span className="text-xl font-extrabold text-primary">
-            {role === "employer" ? "پنل کارفرما" : "پنل کارجو"}
+            {role === "admin" ? "مدیریت کل جابیکس" : role === "employer" ? "پنل کارفرما" : "پنل کارجو"}
           </span>
           <button onClick={toggleSidebar} className="lg:hidden text-slate-500 hover:text-slate-700">
             <X className="h-5 w-5" />
@@ -73,7 +100,9 @@ export function Sidebar({ role }: SidebarProps) {
         {/* لینک‌های منو */}
         <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
           {links.map((link) => {
-            const isActive = pathname === link.href;
+            // این لاجیک برای اینه که اگه ادمین رفت تو زیرمجموعه یک منو، باز هم دکمه منو روشن بمونه
+            const isActive = pathname === link.href || (pathname.startsWith(link.href + '/') && link.href !== '/admin' && link.href !== '/employer' && link.href !== '/job-seeker');
+            
             return (
               <Link
                 key={link.name}
@@ -96,7 +125,10 @@ export function Sidebar({ role }: SidebarProps) {
 
         {/* بخش خروج */}
         <div className="p-4 border-t border-slate-100">
-          <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
+          <button 
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+          >
             <LogOut className="h-5 w-5" />
             خروج از حساب
           </button>

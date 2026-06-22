@@ -4,14 +4,16 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { MapSelector } from "@/components/shared/MapSelector";
-import { Briefcase, CheckCircle2, MapPin } from "lucide-react";
+import { Briefcase, CheckCircle2, MapPin, AlertCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase";
+import { useStore } from "@/store/useStore";
 
-// تعریف قوانین اعتبارسنجی (اضافه شدن coordinates برای نقشه)
 const jobSchema = z.object({
   title: z.string().min(5, "عنوان آگهی باید حداقل ۵ حرف باشد"),
   category: z.string().min(1, "لطفاً دسته‌بندی شغلی را انتخاب کنید"),
@@ -19,14 +21,19 @@ const jobSchema = z.object({
   salary: z.string().min(1, "بازه حقوقی را مشخص کنید"),
   location: z.string().min(2, "شهر محل کار را وارد کنید"),
   description: z.string().min(50, "توضیحات آگهی باید حداقل ۵۰ کاراکتر باشد"),
-  coordinates: z.array(z.number()).optional(), // [lat, lng]
+  coordinates: z.array(z.number()).optional(),
 });
 
 type JobFormValues = z.infer<typeof jobSchema>;
 
 export default function PostJobPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const { user } = useStore();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -37,16 +44,41 @@ export default function PostJobPage() {
     resolver: zodResolver(jobSchema),
   });
 
-  const onSubmit = (data: JobFormValues) => {
+  const onSubmit = async (data: JobFormValues) => {
+    if (!user?.id) {
+      setErrorMessage("شما وارد حساب کاربری نشده‌اید!");
+      return;
+    }
+
     setIsSubmitting(true);
+    setErrorMessage(null);
     
-    // شبیه‌سازی ارسال
-    console.log("دیتای آماده ارسال به دیتابیس (همراه با مختصات نقشه):", data);
-    
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // اینسرت کردن دیتا در جدول jobs
+      const { error } = await supabase
+        .from('jobs')
+        .insert({
+          employer_id: user.id,
+          title: data.title,
+          category: data.category,
+          job_type: data.jobType,
+          salary_range: data.salary,
+          location_text: data.location,
+          description: data.description,
+          lat: data.coordinates?.[0] || null,
+          lng: data.coordinates?.[1] || null,
+          status: 'active' // برای تست، آگهی رو مستقیماً فعال می‌کنیم
+        });
+
+      if (error) throw error;
+
       setIsSuccess(true);
-    }, 2000);
+    } catch (err: any) {
+      console.error("خطا در ثبت آگهی:", err);
+      setErrorMessage("خطایی در ثبت آگهی رخ داد. لطفاً فیلدها را بررسی کنید.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSuccess) {
@@ -57,11 +89,11 @@ export default function PostJobPage() {
         </div>
         <h2 className="text-2xl font-bold text-slate-900">آگهی شما با موفقیت ثبت شد!</h2>
         <p className="mt-2 text-slate-600 max-w-md">
-          آگهی شما پس از تایید توسط ناظرین در لیست مشاغل قرار خواهد گرفت. 
+          آگهی شما هم‌اکنون در سیستم فعال است و کارجویان می‌توانند برای آن رزومه ارسال کنند.
         </p>
         <Button 
           className="mt-8 rounded-xl px-8" 
-          onClick={() => window.location.href = '/employer/jobs'}
+          onClick={() => router.push('/employer/jobs')}
         >
           مشاهده آگهی‌های من
         </Button>
@@ -80,6 +112,13 @@ export default function PostJobPage() {
           اطلاعات شغل مورد نیاز خود را با دقت وارد کنید تا بهترین کارجویان را پیدا کنید.
         </p>
       </div>
+
+      {errorMessage && (
+        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+          <p>{errorMessage}</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-slate-100">
         
@@ -144,7 +183,7 @@ export default function PostJobPage() {
               موقعیت دقیق روی نقشه (اختیاری)
             </h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              با انتخاب دقیق مکان شرکت روی نقشه، کارجویان محلی راحت‌تر آگهی شما را پیدا می‌کنند. یک بار روی نقشه کلیک کنید تا پین ثبت شود.
+              با انتخاب دقیق مکان شرکت روی نقشه، کارجویان محلی راحت‌تر آگهی شما را پیدا می‌کنند.
             </p>
           </div>
           <MapSelector 
@@ -165,7 +204,7 @@ export default function PostJobPage() {
 
         {/* دکمه ارسال */}
         <div className="flex items-center justify-end gap-4 border-t border-slate-100 pt-6">
-          <Button type="button" variant="ghost" disabled={isSubmitting}>
+          <Button type="button" variant="ghost" disabled={isSubmitting} onClick={() => router.back()}>
             انصراف
           </Button>
           <Button type="submit" size="lg" isLoading={isSubmitting} className="rounded-xl px-8 shadow-lg shadow-primary/20">

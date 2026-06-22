@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Vazirmatn } from "next/font/google";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
-// پیکربندی فونت وزیرمتن
 const vazirmatn = Vazirmatn({
   subsets: ["arabic", "latin"],
   display: "swap",
@@ -10,8 +10,8 @@ const vazirmatn = Vazirmatn({
 });
 
 export const metadata: Metadata = {
-  title: "Jobix | بازار هوشمند استخدام ایران",
-  description: "پلتفرم هوشمند کاریابی و استخدام",
+  title: "جابیکس | بازار هوشمند استخدام ایران",
+  description: "جابیکس، پلتفرم هوشمند کاریابی و استخدام",
 };
 
 export default function RootLayout({
@@ -22,7 +22,10 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className={`h-full antialiased ${vazirmatn.variable}`}>
       <body className="min-h-full flex flex-col">
-        {children}
+        {/* AuthProvider تمامی صفحات را در بر می‌گیرد تا استیت کاربر همه‌جا در دسترس باشد */}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

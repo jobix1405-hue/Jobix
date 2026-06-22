@@ -1,68 +1,33 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
+import { useState, useMemo, Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Search, MapPin, Briefcase, Clock, ChevronLeft, Filter, X } from "lucide-react";
+import { Search, MapPin, Briefcase, Clock, ChevronLeft, Filter, X, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { createClient } from "@/lib/supabase";
 
-// دیتای تستی پیشرفته‌تر برای تست فیلترها
-const MOCK_JOBS = [
-  {
-    id: "1",
-    title: "برنامه‌نویس ارشد فرانت‌اند (React/Next.js)",
-    company: "گروه فناوری دیجی‌کالا",
-    location: "تهران، ونک",
-    typeLabel: "تمام وقت",
-    typeValue: "full-time",
-    salaryLabel: "بیش از ۳۰ میلیون تومان",
-    salaryValue: "30+",
-    timeAgo: "۲ ساعت پیش",
-    logo: "د"
-  },
-  {
-    id: "2",
-    title: "طراح رابط کاربری (UI/UX Designer)",
-    company: "اسنپ",
-    location: "دورکاری",
-    typeLabel: "دورکاری",
-    typeValue: "remote",
-    salaryLabel: "توافقی",
-    salaryValue: "negotiable",
-    timeAgo: "۵ ساعت پیش",
-    logo: "ا"
-  },
-  {
-    id: "3",
-    title: "مدیر دیجیتال مارکتینگ",
-    company: "تپسی",
-    location: "تهران، سعادت آباد",
-    typeLabel: "تمام وقت",
-    typeValue: "full-time",
-    salaryLabel: "۲۰ تا ۳۰ میلیون تومان",
-    salaryValue: "20-30",
-    timeAgo: "۱ روز پیش",
-    logo: "ت"
-  },
-  {
-    id: "4",
-    title: "توسعه‌دهنده بک‌اند (Python/Django)",
-    company: "علی‌بابا",
-    location: "تهران",
-    typeLabel: "پاره وقت",
-    typeValue: "part-time",
-    salaryLabel: "۱۰ تا ۲۰ میلیون تومان",
-    salaryValue: "10-20",
-    timeAgo: "۲ روز پیش",
-    logo: "ع"
-  }
-];
+// دیکشنری برای تبدیل مقادیر دیتابیس به لیبل‌های فارسی در کارت‌ها
+const JOB_TYPES: Record<string, string> = {
+  "full-time": "تمام وقت",
+  "part-time": "پاره وقت",
+  "remote": "دورکاری",
+  "internship": "کارآموزی"
+};
+
+const SALARY_RANGES: Record<string, string> = {
+  "negotiable": "توافقی",
+  "10-20": "۱۰ تا ۲۰ میلیون",
+  "20-30": "۲۰ تا ۳۰ میلیون",
+  "30+": "بیشتر از ۳۰ میلیون"
+};
 
 // کامپوننت اصلی سرچ که از SearchParams استفاده می‌کنه
 function JobsSearchContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const supabase = createClient();
 
   // خواندن مقادیر فعلی از URL
   const currentQ = searchParams.get("q") || "";
@@ -73,6 +38,33 @@ function JobsSearchContent() {
   // استیت‌های محلی برای اینپوت‌های متنی (که موقع تایپ کردن لگ نداشته باشیم)
   const [searchQuery, setSearchQuery] = useState(currentQ);
   const [locationQuery, setLocationQuery] = useState(currentLoc);
+
+  // استیت‌های واقعی دیتابیس
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // واکشی آگهی‌های فعال از دیتابیس سوپابیس
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*, profiles(company_name, logo_url)')
+          .eq('status', 'active') // فقط آگهی‌های فعال
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setJobs(data || []);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [supabase]);
 
   // تابع ساخت کوئری استرینگ جدید
   const createQueryString = (name: string, value: string) => {
@@ -109,26 +101,29 @@ function JobsSearchContent() {
     router.push(pathname, { scroll: false });
   };
 
-  // فیلتر کردن دیتای تستی بر اساس پارامترهای URL
+  // فیلتر کردن دیتای واکشی شده از دیتابیس بر اساس پارامترهای URL
   const filteredJobs = useMemo(() => {
-    return MOCK_JOBS.filter((job) => {
-      // سرچ متنی در عنوان و شرکت
+    return jobs.filter((job) => {
+      // سرچ متنی در عنوان و شرکت (مقاوم در برابر null بودن)
+      const jobTitle = job.title?.toLowerCase() || "";
+      const compName = job.profiles?.company_name?.toLowerCase() || "";
+      
       const matchesQ = !currentQ || 
-        job.title.toLowerCase().includes(currentQ.toLowerCase()) || 
-        job.company.toLowerCase().includes(currentQ.toLowerCase());
+        jobTitle.includes(currentQ.toLowerCase()) || 
+        compName.includes(currentQ.toLowerCase());
       
       // سرچ مکان
-      const matchesLoc = !currentLoc || job.location.includes(currentLoc);
+      const matchesLoc = !currentLoc || (job.location_text && job.location_text.includes(currentLoc));
       
       // فیلتر نوع همکاری
-      const matchesType = !currentType || job.typeValue === currentType;
+      const matchesType = !currentType || job.job_type === currentType;
       
       // فیلتر حقوق
-      const matchesSalary = !currentSalary || job.salaryValue === currentSalary;
+      const matchesSalary = !currentSalary || job.salary_range === currentSalary;
 
       return matchesQ && matchesLoc && matchesType && matchesSalary;
     });
-  }, [currentQ, currentLoc, currentType, currentSalary]);
+  }, [jobs, currentQ, currentLoc, currentType, currentSalary]);
 
   const activeFiltersCount = [currentQ, currentLoc, currentType, currentSalary].filter(Boolean).length;
 
@@ -145,7 +140,7 @@ function JobsSearchContent() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                placeholder="عنوان شغل یا مهارت (مثلاً React)..." 
+                placeholder="عنوان شغل، شرکت یا مهارت (مثلاً React)..." 
                 className="w-full h-12 bg-transparent pr-12 pl-4 text-sm focus:outline-none placeholder:text-slate-500"
               />
             </div>
@@ -198,6 +193,7 @@ function JobsSearchContent() {
                     { value: "full-time", label: 'تمام وقت' },
                     { value: "part-time", label: 'پاره وقت' },
                     { value: "remote", label: 'دورکاری' },
+                    { value: "internship", label: 'کارآموزی' },
                   ].map((type) => (
                     <label key={type.value} className="flex items-center gap-2 cursor-pointer group">
                       <input 
@@ -246,11 +242,17 @@ function JobsSearchContent() {
         <div className="w-full lg:w-3/4 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-bold text-slate-800">
-              <span className="text-primary">{filteredJobs.length}</span> فرصت شغلی پیدا شد
+              {isLoading ? "در حال جستجو..." : <><span className="text-primary">{filteredJobs.length}</span> فرصت شغلی پیدا شد</>}
             </h2>
           </div>
 
-          {filteredJobs.length > 0 ? (
+          {isLoading ? (
+            // استیت لودینگ زیبا
+            <div className="flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200 py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-slate-500 text-sm font-medium">در حال دریافت جدیدترین آگهی‌ها...</p>
+            </div>
+          ) : filteredJobs.length > 0 ? (
             filteredJobs.map((job) => (
               <Link 
                 key={job.id} 
@@ -259,27 +261,32 @@ function JobsSearchContent() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl font-bold text-primary">
-                      {job.logo}
+                    {/* رندر هوشمند لوگو یا حرف اول شرکت */}
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl font-bold text-primary overflow-hidden border border-primary/20">
+                      {job.profiles?.logo_url ? (
+                        <img src={job.profiles.logo_url} alt="logo" className="w-full h-full object-cover" />
+                      ) : (
+                        job.profiles?.company_name ? job.profiles.company_name.charAt(0) : <Building2 className="h-6 w-6"/>
+                      )}
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-slate-900 transition-colors group-hover:text-primary">
                         {job.title}
                       </h3>
                       <p className="mt-1 text-sm text-slate-500 font-medium">
-                        {job.company}
+                        {job.profiles?.company_name || 'شرکت نامشخص'}
                       </p>
                       <div className="mt-4 flex flex-wrap items-center gap-3">
                         <span className="flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-600">
                           <MapPin className="h-3.5 w-3.5" />
-                          {job.location}
+                          {job.location_text || 'نامشخص'}
                         </span>
                         <span className="flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1 text-xs text-slate-600">
                           <Briefcase className="h-3.5 w-3.5" />
-                          {job.typeLabel}
+                          {JOB_TYPES[job.job_type] || job.job_type}
                         </span>
                         <span className="flex items-center gap-1.5 rounded-md bg-green-50 px-2.5 py-1 text-xs text-green-700 font-medium">
-                          {job.salaryLabel}
+                          {SALARY_RANGES[job.salary_range] || job.salary_range}
                         </span>
                       </div>
                     </div>
@@ -287,7 +294,7 @@ function JobsSearchContent() {
                   <div className="flex flex-col items-end justify-between h-full gap-8">
                     <span className="flex items-center gap-1 text-xs text-slate-400">
                       <Clock className="h-3.5 w-3.5" />
-                      {job.timeAgo}
+                      {new Date(job.created_at).toLocaleDateString('fa-IR')}
                     </span>
                     <div className="flex items-center gap-1 text-sm font-semibold text-primary opacity-0 -translate-x-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0">
                       مشاهده آگهی

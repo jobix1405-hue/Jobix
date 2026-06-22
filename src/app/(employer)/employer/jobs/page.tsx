@@ -1,67 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Edit2, 
-  PauseCircle, 
-  PlayCircle, 
-  Trash2, 
-  Eye,
-  Users,
-  AlertCircle
+  Plus, Search, Edit2, PauseCircle, PlayCircle, 
+  Trash2, Eye, Users, AlertCircle, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { createClient } from "@/lib/supabase";
+import { useStore } from "@/store/useStore";
 
-// تایپ وضعیت آگهی‌ها
-type JobStatus = "active" | "paused" | "draft" | "expired";
+type JobStatus = "active" | "paused" | "draft" | "expired" | "pending";
 
-// دیتای تستی برای آگهی‌های کارفرما
-const INITIAL_MY_JOBS = [
-  {
-    id: "job-1",
-    title: "برنامه‌نویس ارشد فرانت‌اند (React/Next.js)",
-    status: "active" as JobStatus,
-    views: 1240,
-    applicants: 45,
-    createdAt: "۱۴۰۳/۰۸/۱۰",
-    expiresAt: "۱۴۰۳/۰۹/۱۰",
-  },
-  {
-    id: "job-2",
-    title: "طراح رابط کاربری (UI/UX Designer)",
-    status: "paused" as JobStatus,
-    views: 850,
-    applicants: 12,
-    createdAt: "۱۴۰۳/۰۷/۱۵",
-    expiresAt: "۱۴۰۳/۰۸/۱۵",
-  },
-  {
-    id: "job-3",
-    title: "توسعه‌دهنده بک‌اند (Node.js)",
-    status: "draft" as JobStatus,
-    views: 0,
-    applicants: 0,
-    createdAt: "۱۴۰۳/۰۸/۱۸",
-    expiresAt: "-",
-  },
-  {
-    id: "job-4",
-    title: "مدیر محصول",
-    status: "expired" as JobStatus,
-    views: 3200,
-    applicants: 120,
-    createdAt: "۱۴۰۳/۰۵/۰۱",
-    expiresAt: "۱۴۰۳/۰۶/۰۱",
-  },
-];
+interface JobData {
+  id: string;
+  title: string;
+  status: JobStatus;
+  views: number;
+  applicants_count: number;
+  created_at: string;
+  updated_at: string;
+}
 
-// تابع کمکی برای استایل دادن به وضعیت آگهی
 const getStatusConfig = (status: JobStatus) => {
   switch (status) {
     case "active":
@@ -72,48 +33,100 @@ const getStatusConfig = (status: JobStatus) => {
       return { label: "پیش‌نویس", color: "bg-slate-100 text-slate-700 border-slate-200" };
     case "expired":
       return { label: "منقضی شده", color: "bg-red-100 text-red-700 border-red-200" };
+    case "pending":
+      return { label: "در حال بررسی", color: "bg-blue-100 text-blue-700 border-blue-200" };
+    default:
+      return { label: "نامشخص", color: "bg-slate-100 text-slate-700 border-slate-200" };
   }
 };
 
 export default function EmployerJobsPage() {
-  const [jobs, setJobs] = useState(INITIAL_MY_JOBS);
+  const supabase = createClient();
+  const { user } = useStore();
+
+  const [jobs, setJobs] = useState<JobData[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   
   // استیت‌های مربوط به مودال حذف
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
 
-  // فیلتر کردن آگهی‌ها بر اساس سرچ
+  // واکشی آگهی‌های کارفرما از دیتابیس
+  useEffect(() => {
+    const fetchJobs = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('id, title, status, views, applicants_count, created_at, updated_at')
+          .eq('employer_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setJobs(data || []);
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [user?.id, supabase]);
+
   const filteredJobs = jobs.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // تغییر وضعیت آگهی (فعال/متوقف)
-  const toggleJobStatus = (id: string, currentStatus: JobStatus) => {
+  // تغییر وضعیت آگهی (آبجکت تو دیتابیس آپدیت میشه)
+  const toggleJobStatus = async (id: string, currentStatus: JobStatus) => {
     if (currentStatus === "draft" || currentStatus === "expired") return;
-    
     const newStatus = currentStatus === "active" ? "paused" : "active";
+    
+    // آپدیت UI به صورت Optimistic (آنی)
     setJobs(jobs.map(job => job.id === id ? { ...job, status: newStatus } : job));
+
+    // آپدیت دیتابیس
+    await supabase.from('jobs').update({ status: newStatus }).eq('id', id);
   };
 
-  // هندل کردن حذف آگهی
   const confirmDelete = (id: string) => {
     setJobToDelete(id);
     setIsDeleteModalOpen(true);
   };
 
-  const executeDelete = () => {
+  const executeDelete = async () => {
     if (jobToDelete) {
+      // 1. آپدیت UI
       setJobs(jobs.filter(job => job.id !== jobToDelete));
       setIsDeleteModalOpen(false);
+      
+      // 2. حذف از دیتابیس
+      await supabase.from('jobs').delete().eq('id', jobToDelete);
       setJobToDelete(null);
     }
   };
 
+  // فرمت تاریخ برای نمایش
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fa-IR', {
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl animate-in fade-in duration-500">
       
-      {/* هدر صفحه و دکمه ثبت آگهی جدید */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">آگهی‌های من</h1>
@@ -129,7 +142,6 @@ export default function EmployerJobsPage() {
         </Link>
       </div>
 
-      {/* نوار جستجو */}
       <div className="mb-6 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center">
         <Search className="h-5 w-5 text-slate-400 mr-3" />
         <input
@@ -141,7 +153,6 @@ export default function EmployerJobsPage() {
         />
       </div>
 
-      {/* لیست آگهی‌ها */}
       <div className="flex flex-col gap-4">
         {filteredJobs.length > 0 ? (
           filteredJobs.map((job) => {
@@ -152,7 +163,6 @@ export default function EmployerJobsPage() {
                 key={job.id} 
                 className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 transition-all hover:border-primary/30 hover:shadow-md"
               >
-                {/* اطلاعات اصلی آگهی */}
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h3 className="text-lg font-bold text-slate-900">{job.title}</h3>
@@ -163,38 +173,31 @@ export default function EmployerJobsPage() {
                   
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-500 mt-3">
                     <span className="flex items-center gap-1.5">
-                      <span className="text-slate-400">تاریخ ثبت:</span> {job.createdAt}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-slate-400">انقضا:</span> {job.expiresAt}
+                      <span className="text-slate-400">تاریخ ثبت:</span> {formatDate(job.created_at)}
                     </span>
                   </div>
                 </div>
 
-                {/* آمارهای آگهی */}
                 <div className="flex items-center gap-6 border-y lg:border-y-0 lg:border-x border-slate-100 py-4 lg:py-0 lg:px-8">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                       <Eye className="h-4 w-4" />
                       <span className="text-xs">بازدید</span>
                     </div>
-                    <span className="font-bold text-slate-900">{job.views.toLocaleString('fa-IR')}</span>
+                    <span className="font-bold text-slate-900">{(job.views || 0).toLocaleString('fa-IR')}</span>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                       <Users className="h-4 w-4" />
                       <span className="text-xs">رزومه</span>
                     </div>
-                    <span className={`font-bold ${job.applicants > 0 ? 'text-primary' : 'text-slate-900'}`}>
-                      {job.applicants.toLocaleString('fa-IR')}
+                    <span className={`font-bold ${(job.applicants_count || 0) > 0 ? 'text-primary' : 'text-slate-900'}`}>
+                      {(job.applicants_count || 0).toLocaleString('fa-IR')}
                     </span>
                   </div>
                 </div>
 
-                {/* دکمه‌های عملیات */}
                 <div className="flex items-center justify-end gap-2 shrink-0 pt-2 lg:pt-0">
-                  
-                  {/* دکمه رزومه‌ها (فقط اگه پیش‌نویس نباشه) */}
                   {job.status !== "draft" && (
                     <Link href={`/employer/applications?job=${job.id}`}>
                       <Button variant="outline" size="sm" className="h-10 px-4 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800">
@@ -203,7 +206,6 @@ export default function EmployerJobsPage() {
                     </Link>
                   )}
 
-                  {/* دکمه توقف / پخش */}
                   {(job.status === "active" || job.status === "paused") && (
                     <button 
                       onClick={() => toggleJobStatus(job.id, job.status)}
@@ -214,17 +216,12 @@ export default function EmployerJobsPage() {
                     </button>
                   )}
 
-                  {/* دکمه ویرایش */}
                   <Link href={`/employer/post-job?edit=${job.id}`}>
-                    <button 
-                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                      title="ویرایش آگهی"
-                    >
+                    <button className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors" title="ویرایش آگهی">
                       <Edit2 className="h-5 w-5" />
                     </button>
                   </Link>
 
-                  {/* دکمه حذف */}
                   <button 
                     onClick={() => confirmDelete(job.id)}
                     className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors"
@@ -232,26 +229,23 @@ export default function EmployerJobsPage() {
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
-
                 </div>
               </div>
             );
           })
         ) : (
-          // حالت خالی (بدون نتیجه)
           <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
             <div className="mb-4 rounded-full bg-white p-4 shadow-sm text-slate-400">
               <Search className="h-8 w-8" />
             </div>
             <h3 className="text-lg font-bold text-slate-900">آگهی یافت نشد</h3>
             <p className="mt-2 text-sm text-slate-500 max-w-sm">
-              هیچ آگهی با این عنوان پیدا نشد. می‌توانید یک آگهی جدید ثبت کنید.
+              شما هنوز آگهی ثبت نکرده‌اید یا نتیجه‌ای با این جستجو پیدا نشد.
             </p>
           </div>
         )}
       </div>
 
-      {/* مودال تایید حذف آگهی */}
       <Modal 
         isOpen={isDeleteModalOpen} 
         onClose={() => setIsDeleteModalOpen(false)}
@@ -263,21 +257,13 @@ export default function EmployerJobsPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-900 mb-2">آیا از حذف این آگهی مطمئن هستید؟</h3>
           <p className="text-sm text-slate-500 leading-relaxed">
-            با حذف این آگهی، تمامی اطلاعات آن از داشبورد شما پاک خواهد شد. رزومه‌های دریافتی همچنان در بخش رزومه‌ها باقی می‌مانند. (این عملیات غیرقابل بازگشت است)
+            با حذف این آگهی، تمامی اطلاعات آن از پایگاه داده پاک خواهد شد. (این عملیات غیرقابل بازگشت است)
           </p>
-          
           <div className="mt-8 flex w-full gap-3">
-            <Button 
-              variant="outline" 
-              className="flex-1 h-12" 
-              onClick={() => setIsDeleteModalOpen(false)}
-            >
+            <Button variant="outline" className="flex-1 h-12" onClick={() => setIsDeleteModalOpen(false)}>
               انصراف
             </Button>
-            <Button 
-              className="flex-1 h-12 bg-red-600 hover:bg-red-700 focus:ring-red-600" 
-              onClick={executeDelete}
-            >
+            <Button className="flex-1 h-12 bg-red-600 hover:bg-red-700" onClick={executeDelete}>
               بله، حذف شود
             </Button>
           </div>

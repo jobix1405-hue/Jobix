@@ -1,57 +1,147 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   Briefcase, 
   Eye, 
   Bookmark, 
   ChevronLeft, 
-  TrendingUp, 
   Clock, 
   CheckCircle2, 
   AlertCircle,
-  MapPin,
-  Building2
+  Building2,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { createClient } from "@/lib/supabase";
+import { useStore } from "@/store/useStore";
+import { calculateMatchScore } from "@/lib/matching"; // 🔥 اضافه شدن الگوریتم هوشمند
 
-// دیتای تستی برای داشبورد
-const MOCK_STATS = {
-  applied: 12,
-  views: 45,
-  saved: 8,
-  profileCompletion: 75, // درصد تکمیل پروفایل
-};
-
-const RECENT_APPLICATIONS = [
-  { id: 1, role: "برنامه‌نویس فرانت‌اند", company: "دیجی‌کالا", status: "interview", date: "۲ روز پیش" },
-  { id: 2, role: "توسعه‌دهنده React", company: "اسنپ", status: "reviewed", date: "۵ روز پیش" },
-  { id: 3, role: "طراح UI/UX", company: "تپسی", status: "pending", date: "هفته پیش" },
-];
-
-const RECOMMENDED_JOBS = [
-  { id: "1", title: "توسعه‌دهنده ارشد فرانت‌اند", company: "علی‌بابا", location: "تهران", salary: "۳۰-۴۰ میلیون", match: 92 },
-  { id: "2", title: "برنامه‌نویس React.js", company: "کافه بازار", location: "دورکاری", salary: "توافقی", match: 85 },
-];
-
-// تابع کمکی وضعیت درخواست
 const getStatusBadge = (status: string) => {
   switch (status) {
     case "pending": return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-xs font-bold">در انتظار</span>;
     case "reviewed": return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-xs font-bold">دیده شده</span>;
     case "interview": return <span className="bg-green-100 text-green-700 px-2 py-1 rounded-md text-xs font-bold">مصاحبه</span>;
+    case "rejected": return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">رد شده</span>;
     default: return null;
   }
 };
 
 export default function JobSeekerDashboard() {
+  const supabase = createClient();
+  const { user } = useStore();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [userName, setUserName] = useState("کارجو");
+  const [stats, setStats] = useState({ applied: 0, views: 0, saved: 0, profileCompletion: 0 });
+  const [recentApps, setRecentApps] = useState<any[]>([]);
+  const [recommendedJobs, setRecommendedJobs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        let completionRate = 0;
+        
+        if (profile) {
+          if (profile.first_name) setUserName(profile.first_name);
+          
+          const checkFields = ['first_name', 'last_name', 'job_title', 'about_me', 'skills', 'university', 'last_company'];
+          const filledFields = checkFields.filter(f => profile[f] && profile[f].trim() !== '').length;
+          completionRate = Math.round((filledFields / checkFields.length) * 100);
+        }
+
+        const { data: applications } = await supabase
+          .from('applications')
+          .select(`id, status, created_at, jobs (id, title, profiles (company_name))`)
+          .eq('job_seeker_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (applications) {
+          const formattedApps = applications.slice(0, 4).map((app: any) => {
+            const jp = Array.isArray(app.jobs?.profiles) ? app.jobs?.profiles[0] : app.jobs?.profiles;
+            return {
+              id: app.id,
+              role: app.jobs?.title || 'نامشخص',
+              company: jp?.company_name || 'شرکت نامشخص',
+              status: app.status,
+              date: new Date(app.created_at).toLocaleDateString('fa-IR')
+            };
+          });
+          setRecentApps(formattedApps);
+        }
+
+        const { count: savedCount } = await supabase
+          .from('saved_jobs')
+          .select('*', { count: 'exact', head: true })
+          .eq('job_seeker_id', user.id);
+
+        // 🔥 واکشی آگهی‌های فعال برای پیشنهاد هوشمند
+        const { data: jobs } = await supabase
+          .from('jobs')
+          .select('id, title, description, profiles(company_name)')
+          .eq('status', 'active');
+
+        if (jobs && profile) {
+          // محاسبه امتیاز تطابق برای هر آگهی
+          const scoredJobs = jobs.map((j: any) => {
+            const jp = Array.isArray(j.profiles) ? j.profiles[0] : j.profiles;
+            const matchScore = calculateMatchScore(
+              { job_title: profile.job_title, skills: profile.skills },
+              { title: j.title, description: j.description }
+            );
+
+            return {
+              id: j.id,
+              title: j.title,
+              company: jp?.company_name || 'نامشخص',
+              match: matchScore
+            };
+          });
+
+          // مرتب‌سازی بر اساس بالاترین درصد و انتخاب ۳ تای اول
+          const topRecommendations = scoredJobs
+            .sort((a, b) => b.match - a.match)
+            .slice(0, 3);
+
+          setRecommendedJobs(topRecommendations);
+        }
+
+        setStats({
+          applied: applications?.length || 0,
+          views: 0, 
+          saved: savedCount || 0,
+          profileCompletion: completionRate
+        });
+
+      } catch (err) {
+        console.error("Error fetching job seeker dashboard:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user?.id, supabase]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[70vh] flex-col items-center justify-center gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm font-medium text-slate-500">در حال آماده‌سازی پیشخوان...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl animate-in fade-in duration-500 space-y-8">
       
-      {/* هدر داشبورد و پیام خوش‌آمدگویی */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">سلام، وقت بخیر 👋</h1>
+          <h1 className="text-2xl font-bold text-slate-900">سلام {userName}، وقت بخیر 👋</h1>
           <p className="mt-2 text-sm text-slate-500">
             این خلاصه‌ای از فعالیت‌های شما در جابیکس است.
           </p>
@@ -61,38 +151,27 @@ export default function JobSeekerDashboard() {
         </div>
       </div>
 
-      {/* ویجت‌های آماری (ردیف اول) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-        
-        {/* کارت درخواست‌ها */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <Briefcase className="h-6 w-6" />
             </div>
-            <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-              <TrendingUp className="h-3 w-3" /> +۲ این ماه
-            </span>
           </div>
           <p className="text-sm font-medium text-slate-500">درخواست‌های ارسال شده</p>
-          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{MOCK_STATS.applied}</h3>
+          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{stats.applied}</h3>
         </div>
 
-        {/* کارت بازدید رزومه */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md opacity-70">
           <div className="flex items-center justify-between mb-4">
             <div className="h-12 w-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
               <Eye className="h-6 w-6" />
             </div>
-            <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-              <TrendingUp className="h-3 w-3" /> +۱۲٪ رشد
-            </span>
           </div>
           <p className="text-sm font-medium text-slate-500">بازدید کارفرمایان از رزومه</p>
-          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{MOCK_STATS.views}</h3>
+          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{stats.views}</h3>
         </div>
 
-        {/* کارت آگهی‌های نشان‌شده */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
             <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
@@ -100,20 +179,13 @@ export default function JobSeekerDashboard() {
             </div>
           </div>
           <p className="text-sm font-medium text-slate-500">آگهی‌های ذخیره شده</p>
-          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{MOCK_STATS.saved}</h3>
+          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{stats.saved}</h3>
         </div>
-
       </div>
 
-      {/* گرید بخش‌های پایینی (ردیف دوم) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* ستون راست (تکمیل پروفایل + پیشنهادات) */}
         <div className="lg:col-span-1 space-y-6">
-          
-          {/* ویجت تکمیل پروفایل */}
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
-            {/* بک‌گراند دکوری */}
             <div className="absolute -left-6 -top-6 h-24 w-24 rounded-full bg-primary/5 blur-2xl"></div>
             
             <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
@@ -123,14 +195,13 @@ export default function JobSeekerDashboard() {
             
             <div className="flex items-end justify-between mb-2">
               <span className="text-sm text-slate-600 font-medium">میزان تکمیل پروفایل</span>
-              <span className="text-lg font-bold text-primary">{MOCK_STATS.profileCompletion}٪</span>
+              <span className="text-lg font-bold text-primary">{stats.profileCompletion}٪</span>
             </div>
             
-            {/* Progress Bar */}
             <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden mb-4">
               <div 
                 className="h-full bg-primary rounded-full transition-all duration-1000" 
-                style={{ width: `${MOCK_STATS.profileCompletion}%` }}
+                style={{ width: `${stats.profileCompletion}%` }}
               ></div>
             </div>
 
@@ -139,17 +210,16 @@ export default function JobSeekerDashboard() {
             </p>
 
             <Link href="/job-seeker/resume">
-              <Button className="w-full rounded-xl">تکمیل رزومه</Button>
+              <Button className="w-full rounded-xl">ویرایش رزومه</Button>
             </Link>
           </div>
 
-          {/* ویجت آگهی‌های پیشنهادی */}
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
             <h3 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-4">
               پیشنهادات هوشمند برای شما
             </h3>
             <div className="space-y-4">
-              {RECOMMENDED_JOBS.map((job) => (
+              {recommendedJobs.map((job) => (
                 <Link key={job.id} href={`/jobs/${job.id}`} className="group block">
                   <div className="p-3 rounded-2xl border border-slate-100 bg-slate-50 transition-all hover:border-primary/30 hover:bg-white">
                     <h4 className="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors">{job.title}</h4>
@@ -157,7 +227,11 @@ export default function JobSeekerDashboard() {
                       <Building2 className="h-3 w-3" /> {job.company}
                     </p>
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                        job.match >= 75 ? "bg-green-100 text-green-700" :
+                        job.match >= 50 ? "bg-blue-100 text-blue-700" :
+                        "bg-orange-100 text-orange-700"
+                      }`}>
                         تطابق: {job.match}٪
                       </span>
                       <ChevronLeft className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
@@ -165,6 +239,9 @@ export default function JobSeekerDashboard() {
                   </div>
                 </Link>
               ))}
+              {recommendedJobs.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-4">آگهی جدیدی یافت نشد.</p>
+              )}
             </div>
             <Link href="/jobs">
               <Button variant="ghost" className="w-full mt-4 text-sm text-primary hover:bg-primary/5">
@@ -172,21 +249,19 @@ export default function JobSeekerDashboard() {
               </Button>
             </Link>
           </div>
-
         </div>
 
-        {/* ستون چپ (آخرین درخواست‌ها) */}
         <div className="lg:col-span-2">
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-full">
             <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
-              <h3 className="font-bold text-slate-900">پیگیری آخرین درخواست‌ها</h3>
+              <h3 className="font-bold text-slate-900">آخرین درخواست‌ها</h3>
               <Link href="/job-seeker/applications" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
                 مشاهده همه <ChevronLeft className="h-4 w-4" />
               </Link>
             </div>
 
             <div className="space-y-4">
-              {RECENT_APPLICATIONS.map((app) => (
+              {recentApps.map((app) => (
                 <div key={app.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors gap-4">
                   <div className="flex items-start gap-4">
                     <div className="h-12 w-12 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center text-lg font-bold text-slate-400">
@@ -206,31 +281,37 @@ export default function JobSeekerDashboard() {
                   </div>
                 </div>
               ))}
+              
+              {recentApps.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Briefcase className="h-10 w-10 text-slate-300 mb-3" />
+                  <p className="text-sm text-slate-500">هنوز برای هیچ شغلی رزومه ارسال نکرده‌اید.</p>
+                </div>
+              )}
             </div>
 
-            {/* بنر ارتقا رزومه */}
-            <div className="mt-8 bg-gradient-to-r from-primary/10 to-transparent rounded-2xl p-5 border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-primary text-white flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6" />
+            {stats.profileCompletion < 100 && (
+              <div className="mt-8 bg-gradient-to-r from-primary/10 to-transparent rounded-2xl p-5 border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-primary text-white flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900">آیا می‌خواهید بیشتر دیده شوید؟</h4>
+                    <p className="text-xs text-slate-600 mt-1">با اضافه کردن نمونه کار و مهارت‌ها، شانس دعوت به مصاحبه را افزایش دهید.</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-slate-900">آیا می‌خواهید بیشتر دیده شوید؟</h4>
-                  <p className="text-xs text-slate-600 mt-1">با اضافه کردن نمونه کار و مهارت‌ها، شانس دعوت به مصاحبه را افزایش دهید.</p>
-                </div>
+                <Link href="/job-seeker/resume">
+                  <Button variant="outline" size="sm" className="bg-white border-primary text-primary hover:bg-primary hover:text-white shrink-0">
+                    تکمیل رزومه
+                  </Button>
+                </Link>
               </div>
-              <Link href="/job-seeker/resume">
-                <Button variant="outline" size="sm" className="bg-white border-primary text-primary hover:bg-primary hover:text-white shrink-0">
-                  ویرایش رزومه
-                </Button>
-              </Link>
-            </div>
+            )}
 
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }

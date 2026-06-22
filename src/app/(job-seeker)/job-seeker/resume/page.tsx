@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Briefcase, GraduationCap, Code, CheckCircle2, Save } from "lucide-react";
+import { User, Briefcase, GraduationCap, Code, CheckCircle2, Save, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { createClient } from "@/lib/supabase";
+import { useStore } from "@/store/useStore";
 
 // ۱. تعریف قوانین اعتبارسنجی رزومه
 const resumeSchema = z.object({
@@ -29,14 +31,20 @@ const resumeSchema = z.object({
 type ResumeFormValues = z.infer<typeof resumeSchema>;
 
 export default function ResumeBuilderPage() {
+  const supabase = createClient();
+  const { user } = useStore();
+
   const [activeTab, setActiveTab] = useState<"personal" | "experience" | "skills">("personal");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // ۲. اتصال فرم به Zod
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<ResumeFormValues>({
     resolver: zodResolver(resumeSchema),
@@ -53,21 +61,85 @@ export default function ResumeBuilderPage() {
     }
   });
 
-  // ۳. هندل کردن ذخیره رزومه
-  const onSubmit = (data: ResumeFormValues) => {
+  // ۳. خواندن اطلاعات رزومه از دیتابیس در زمان لود صفحه
+  useEffect(() => {
+    const fetchResume = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, job_title, about_me, university, degree, last_company, last_position, skills')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          reset({
+            firstName: data.first_name || "",
+            lastName: data.last_name || "",
+            jobTitle: data.job_title || "",
+            aboutMe: data.about_me || "",
+            university: data.university || "",
+            degree: data.degree || "",
+            lastCompany: data.last_company || "",
+            lastPosition: data.last_position || "",
+            skills: data.skills || "",
+          });
+        }
+      } catch (err) {
+        console.error("خطا در دریافت اطلاعات رزومه:", err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchResume();
+  }, [user?.id, reset, supabase]);
+
+  // ۴. هندل کردن ذخیره رزومه در دیتابیس
+  const onSubmit = async (data: ResumeFormValues) => {
+    if (!user?.id) return;
     setIsSubmitting(true);
+    setErrorMessage(null);
     
-    // اینجا دیتای رزومه رو برای ارسال به دیتابیس (Supabase) آماده می‌کنیم
-    console.log("دیتای رزومه کارجو:", data);
-    
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: data.firstName,
+          last_name: data.lastName,
+          job_title: data.jobTitle,
+          about_me: data.aboutMe,
+          university: data.university,
+          degree: data.degree,
+          last_company: data.lastCompany,
+          last_position: data.lastPosition,
+          skills: data.skills,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
       setIsSuccess(true);
-      
-      // پیام موفقیت بعد از ۳ ثانیه محو میشه
       setTimeout(() => setIsSuccess(false), 3000);
-    }, 1500);
+    } catch (err) {
+      console.error("خطا در ذخیره رزومه:", err);
+      setErrorMessage("خطایی در ذخیره رزومه رخ داد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  // نمایش لودینگ اولیه
+  if (isLoadingData) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl animate-in fade-in duration-500">
@@ -89,6 +161,13 @@ export default function ResumeBuilderPage() {
           </div>
         )}
       </div>
+
+      {errorMessage && (
+        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+          <p>{errorMessage}</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         

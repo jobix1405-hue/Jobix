@@ -1,119 +1,217 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
-import { Search, MapPin, Briefcase, Clock, ChevronLeft, Filter } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { 
+  Settings, 
+  Save, 
+  CheckCircle2,
+  AlertCircle,
+  Phone,
+  Mail,
+  MapPin,
+  ShieldAlert
+} from "lucide-react";
+import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { MOCK_JOBS } from "@/lib/mock-data"; // استفاده از دیتای مرکزی
+import { createClient } from "@/lib/supabase";
+import { useStore } from "@/store/useStore";
 
-export default function JobsPage() {
-  // استیت برای متن جستجو و شهر
-  const [searchTerm, setSearchTerm] = useState("");
-  const [locationTerm, setLocationTerm] = useState("");
+// ۱. تعریف قوانین اعتبارسنجی
+const accountSettingsSchema = z.object({
+  email: z.string().email("فرمت ایمیل معتبر نیست").optional().or(z.literal("")),
+  address: z.string().optional(),
+});
 
-  // منطق فیلتر کردن هوشمند مشاغل
-  const filteredJobs = useMemo(() => {
-    return MOCK_JOBS.filter((job) => {
-      const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            job.companyName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesLocation = job.location.toLowerCase().includes(locationTerm.toLowerCase());
+type SettingsFormValues = z.infer<typeof accountSettingsSchema>;
+
+export default function JobSeekerSettingsPage() {
+  const supabase = createClient();
+  const { user } = useStore();
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<SettingsFormValues>({
+    resolver: zodResolver(accountSettingsSchema),
+    defaultValues: {
+      email: "",
+      address: "",
+    }
+  });
+
+  // ۲. خواندن اطلاعات فعلی کاربر از دیتابیس
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!user?.id) return;
       
-      return matchesSearch && matchesLocation;
-    });
-  }, [searchTerm, locationTerm]);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('email, address')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          reset({
+            email: data.email || "",
+            address: data.address || "",
+          });
+        }
+      } catch (err) {
+        console.error("خطا در دریافت اطلاعات تنظیمات:", err);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchSettings();
+  }, [user?.id, reset, supabase]);
+
+  // ۳. ذخیره تغییرات در دیتابیس
+  const onSubmit = async (data: SettingsFormValues) => {
+    if (!user?.id) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          email: data.email,
+          address: data.address,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err) {
+      console.error("خطا در ذخیره تنظیمات:", err);
+      setErrorMessage("خطایی در ذخیره اطلاعات رخ داد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoadingData) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#f8fafc] pb-20 pt-24">
-      {/* هدر جستجو */}
-      <div className="bg-white border-b border-slate-200 py-8 shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row gap-4 items-center bg-slate-50 p-2 rounded-2xl border border-slate-100">
-            <div className="flex-1 w-full relative">
-              <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="عنوان شغل یا شرکت..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-12 bg-transparent pr-12 pl-4 text-sm focus:outline-none placeholder:text-slate-500"
-              />
-            </div>
-            <div className="hidden md:block w-px h-8 bg-slate-200"></div>
-            <div className="flex-1 w-full relative">
-              <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="شهر..." 
-                value={locationTerm}
-                onChange={(e) => setLocationTerm(e.target.value)}
-                className="w-full h-12 bg-transparent pr-12 pl-4 text-sm focus:outline-none placeholder:text-slate-500"
-              />
-            </div>
-          </div>
+    <div className="mx-auto max-w-3xl animate-in fade-in duration-500">
+      
+      {/* هدر */}
+      <div className="mb-8 flex items-center justify-between border-b border-slate-200 pb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Settings className="h-6 w-6 text-primary" />
+            تنظیمات حساب کاربری
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            مدیریت اطلاعات ارتباطی و تنظیمات امنیتی حساب شما.
+          </p>
         </div>
+        
+        {showSuccess && (
+          <div className="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-2 text-sm font-bold text-green-700 border border-green-100 animate-in slide-in-from-top-2">
+            <CheckCircle2 className="h-5 w-5" />
+            تغییرات ذخیره شد
+          </div>
+        )}
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 flex flex-col lg:flex-row gap-8">
-        {/* سایدبار فیلترها (سمت راست) */}
-        <aside className="w-full lg:w-1/4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 sticky top-24">
-            <div className="flex items-center gap-2 font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4">
-              <Filter className="h-5 w-5 text-primary" />
-              فیلترهای پیشرفته
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              به زودی فیلترهای دسته‌بندی و حقوق به این بخش متصل خواهند شد.
-            </p>
-          </div>
-        </aside>
+      {errorMessage && (
+        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+          <p>{errorMessage}</p>
+        </div>
+      )}
 
-        {/* لیست آگهی‌ها */}
-        <div className="w-full lg:w-3/4 space-y-4">
-          <div className="mb-2">
-            <h2 className="text-lg font-bold text-slate-800">
-              {filteredJobs.length > 0 
-                ? `تعداد ${filteredJobs.length} فرصت شغلی یافت شد` 
-                : "متاسفانه شغلی با این مشخصات پیدا نشد"}
-            </h2>
-          </div>
-
-          {filteredJobs.map((job) => (
-            <Link 
-              key={job.id} 
-              href={`/jobs/${job.id}`} 
-              className="group block bg-white rounded-2xl border border-slate-200 p-6 transition-all hover:border-primary/30 hover:shadow-lg"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl font-bold text-primary">
-                    {job.logo}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-primary transition-colors">
-                      {job.title}
-                    </h3>
-                    <p className="text-sm text-slate-500">{job.companyName}</p>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <span className="flex items-center gap-1 text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded">
-                        <MapPin size={14} /> {job.location}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded">
-                        <Briefcase size={14} /> {job.type}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-6">
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <Clock size={14} /> {job.postedAt}
-                  </span>
-                  <ChevronLeft className="text-primary opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-[-4px]" />
-                </div>
+      <div className="space-y-6">
+        
+        {/* باکس اطلاعات اصلی */}
+        <div className="rounded-3xl border border-slate-100 bg-white p-6 sm:p-8 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">اطلاعات ارتباطی</h2>
+          
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            
+            {/* فیلد شماره موبایل (فقط نمایشی) */}
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">شماره موبایل (تایید شده)</label>
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-500">
+                <Phone className="h-5 w-5 text-green-600" />
+                <span dir="ltr" className="font-semibold">{user?.phone}</span>
+                <span className="mr-auto text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded-md">
+                  غیرقابل تغییر
+                </span>
               </div>
-            </Link>
-          ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <Input
+                label="آدرس ایمیل پشتیبان"
+                {...register("email")}
+                error={errors.email?.message}
+                placeholder="example@gmail.com"
+                dir="ltr"
+                icon={<Mail className="h-4 w-4" />}
+              />
+              <Input
+                label="شهر و منطقه سکونت"
+                {...register("address")}
+                error={errors.address?.message}
+                placeholder="مثال: تهران، پونک"
+                icon={<MapPin className="h-4 w-4" />}
+              />
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button 
+                type="submit" 
+                size="lg" 
+                className="rounded-xl px-8 shadow-lg shadow-primary/20"
+                isLoading={isSubmitting}
+              >
+                <Save className="ml-2 h-5 w-5" />
+                ذخیره تغییرات
+              </Button>
+            </div>
+          </form>
         </div>
+
+        {/* باکس تنظیمات امنیتی (حذف اکانت) */}
+        <div className="rounded-3xl border border-red-100 bg-red-50/30 p-6 sm:p-8">
+          <h2 className="text-lg font-bold text-red-700 mb-2 flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5" />
+            مدیریت حساب و امنیت
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed mb-6">
+            با حذف حساب کاربری، تمامی اطلاعات شما از جمله رزومه، درخواست‌های شغلی و سوابق پیام‌ها برای همیشه پاک شده و غیرقابل بازگشت خواهد بود.
+          </p>
+          
+          <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-600 hover:text-white bg-white">
+            حذف دائمی حساب کاربری
+          </Button>
+        </div>
+
       </div>
-    </main>
+    </div>
   );
 }
