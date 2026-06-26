@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { MapPin, Phone, Mail } from "lucide-react";
+import { MapPin, Phone, Mail, Code2 } from "lucide-react";
 
 // ساخت آیکون‌های SVG اختصاصی برای شبکه‌های اجتماعی
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -109,11 +109,40 @@ export function Footer() {
           </div>
         </div>
         
-        <div className="mt-16 border-t border-slate-200 pt-8 sm:mt-20 lg:mt-24">
-          <p className="text-xs leading-5 text-slate-500 text-center">
+        {/* --- نوار پایین فوتر (Bottom Bar) --- */}
+        <div className="mt-16 border-t border-slate-200 pt-8 sm:mt-20 lg:mt-24 flex flex-col lg:flex-row justify-between items-center gap-6">
+          
+          {/* کپی‌رایت */}
+          <p className="text-xs leading-5 text-slate-500 text-center lg:text-right">
             &copy; {new Date().toLocaleDateString('fa-IR', { year: 'numeric' })} تمامی حقوق برای پلتفرم هوشمند کاریابی جابیکس محفوظ است.
           </p>
+
+          {/* --- امضای کیا دِو (KiyaDev Signature) --- */}
+          <a 
+            href="https://kiyadev.ir" 
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-3 bg-slate-50 hover:bg-slate-900 border border-slate-200 px-4 py-2 rounded-xl transition-all duration-300"
+          >
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] text-slate-500 font-medium group-hover:text-slate-400">
+                طراحی و مهندسی توسط
+              </span>
+              <span className="text-xs font-bold text-slate-700 group-hover:text-white flex items-center gap-1">
+                KiyaDev Team
+                {/* از رنگ نارنجی سازمانی جابیکس (secondary) برای آیکون استفاده شد */}
+                <Code2 className="h-3 w-3 text-secondary group-hover:text-orange-400" />
+              </span>
+            </div>
+            
+            <div className="h-8 w-8 bg-white group-hover:bg-white/10 rounded-lg flex items-center justify-center shadow-sm transition-colors border border-slate-100 group-hover:border-transparent">
+               <Code2 className="h-4 w-4 text-slate-600 group-hover:text-white" />
+            </div>
+          </a>
+          {/* -------------------------------------- */}
+
         </div>
+
       </div>
     </footer>
   );
