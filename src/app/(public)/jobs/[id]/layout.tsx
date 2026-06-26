@@ -2,7 +2,12 @@ import { Metadata } from 'next';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -14,7 +19,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const { data: job } = await supabase
     .from('jobs')
     .select('title, description, profiles(company_name)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (!job) {
@@ -35,8 +40,9 @@ export default async function JobLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -48,7 +54,7 @@ export default async function JobLayout({
   const { data: job } = await supabase
     .from('jobs')
     .select('*, profiles(company_name, logo_url, address)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   let jsonLd = null;
