@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { MapPin, Phone, Mail, Code2 } from "lucide-react";
+import { MapPin, Phone, Mail, Code2, Library } from "lucide-react";
 
 // ساخت آیکون‌های SVG اختصاصی برای شبکه‌های اجتماعی
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -33,15 +33,28 @@ export function Footer() {
           
           {/* بخش معرفی و لوگو */}
           <div className="space-y-8 xl:col-span-1">
-            <Link href="/">
-              <Image
-                src="/logo-full.webp"
-                alt="جابیکس"
-                width={160}
-                height={50}
-                className="object-contain"
-              />
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/">
+                <Image
+                  src="/logo-full.webp"
+                  alt="جابیکس"
+                  width={160}
+                  height={50}
+                  className="object-contain"
+                />
+              </Link>
+
+              {/* === هک سئو: دکمه مخفی پارتنرها (نامرئی برای چشم، قابل دیدن برای گوگل) === */}
+              <Link 
+                href="/partners" 
+                title="EcoSystem"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 opacity-[0.03] hover:opacity-100 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <Library className="w-4 h-4" />
+              </Link>
+              {/* ========================================================== */}
+            </div>
+
             <p className="text-sm leading-relaxed text-slate-500 max-w-xs">
               جابیکس، هوشمندترین پلتفرم کاریابی و استخدام در ایران است که با استفاده از هوش مصنوعی، بهترین استعدادها را به بهترین شرکت‌ها متصل می‌کند.
             </p>
@@ -112,12 +125,10 @@ export function Footer() {
         {/* --- نوار پایین فوتر (Bottom Bar) --- */}
         <div className="mt-16 border-t border-slate-200 pt-8 sm:mt-20 lg:mt-24 flex flex-col lg:flex-row justify-between items-center gap-6">
           
-          {/* کپی‌رایت */}
           <p className="text-xs leading-5 text-slate-500 text-center lg:text-right">
             &copy; {new Date().toLocaleDateString('fa-IR', { year: 'numeric' })} تمامی حقوق برای پلتفرم هوشمند کاریابی جابیکس محفوظ است.
           </p>
 
-          {/* --- امضای کیا دِو (KiyaDev Signature) --- */}
           <a 
             href="https://kiyadev.ir" 
             target="_blank"
@@ -130,7 +141,6 @@ export function Footer() {
               </span>
               <span className="text-xs font-bold text-slate-700 group-hover:text-white flex items-center gap-1">
                 KiyaDev Team
-                {/* از رنگ نارنجی سازمانی جابیکس (secondary) برای آیکون استفاده شد */}
                 <Code2 className="h-3 w-3 text-secondary group-hover:text-orange-400" />
               </span>
             </div>
@@ -139,8 +149,6 @@ export function Footer() {
                <Code2 className="h-4 w-4 text-slate-600 group-hover:text-white" />
             </div>
           </a>
-          {/* -------------------------------------- */}
-
         </div>
 
       </div>
