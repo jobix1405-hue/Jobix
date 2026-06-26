@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Briefcase, Building2 } from "lucide-react";
+import { Briefcase, Building2, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
@@ -12,13 +12,13 @@ export default function OnboardingPage() {
   const supabase = createClient();
   const { user, setUser, isAuthLoading } = useStore();
   
-  // برای هندل کردن وضعیت دکمه‌ها موقع کلیک
   const [loadingRole, setLoadingRole] = useState<"job_seeker" | "employer" | null>(null);
 
-  // اگر کاربر از قبل نقش داشت، نباید اینجا باشه
   useEffect(() => {
     if (!isAuthLoading && user?.role) {
-      router.replace(user.role === "employer" ? "/employer" : "/job-seeker");
+      // 🔥 فیکس مهم: هندل کردن روت ادمین برای مواردی که کاربر ادمین اشتباهاً وارد این صفحه شود
+      const route = user.role === "admin" ? "/admin" : (user.role === "employer" ? "/employer" : "/job-seeker");
+      router.replace(route);
     }
   }, [user, isAuthLoading, router]);
 
@@ -27,36 +27,42 @@ export default function OnboardingPage() {
     
     setLoadingRole(role);
     try {
-      // ۱. آپدیت دیتابیس سوپابیس
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ role: role })
         .eq('id', user.id);
 
-      if (error) {
-        console.error("DB Update Error:", error);
-        throw error;
+      if (profileError) throw profileError;
+
+      if (role === "employer") {
+        const expireDate = new Date();
+        expireDate.setDate(expireDate.getDate() + 30);
+        
+        const { error: subError } = await supabase.from('employer_subscriptions').insert({
+          employer_id: user.id,
+          total_jobs: 1, 
+          used_jobs: 0,
+          expires_at: expireDate.toISOString()
+        });
+        
+        if (subError) console.error("Error giving free job package:", subError);
       }
 
-      // ۲. آپدیت استیت گلوبال (Zustand)
       setUser({ ...user, role });
-
-      // ۳. ریدایرکت به داشبورد مربوطه
       router.push(role === "employer" ? "/employer" : "/job-seeker");
       
     } catch (err) {
+      console.error(err);
       alert("خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.");
       setLoadingRole(null);
     }
   };
 
-  // اگر هنوز در حال چک کردن سشن هستیم، چیزی رندر نکن (جلوگیری از پرش تصویر)
   if (isAuthLoading || user?.role) return null;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 py-12">
       
-      {/* لوگو */}
       <div className="mb-12 animate-in fade-in slide-in-from-top-8 duration-700">
         <Image
           src="/logo-minimal.webp"
@@ -69,8 +75,9 @@ export default function OnboardingPage() {
       </div>
 
       <div className="w-full max-w-3xl text-center animate-in fade-in zoom-in-95 duration-500">
-        <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">
-          به جابیکس خوش آمدید! 🎉
+        <h1 className="flex items-center justify-center gap-3 text-3xl font-extrabold text-slate-900 sm:text-4xl">
+          به جابیکس خوش آمدید!
+          <Sparkles className="h-8 w-8 text-amber-500 animate-pulse" />
         </h1>
         <p className="mt-4 text-lg text-slate-600">
           برای شروع، لطفاً مشخص کنید که با چه هدفی وارد پلتفرم شده‌اید؟
@@ -78,7 +85,6 @@ export default function OnboardingPage() {
 
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2">
           
-          {/* کارت کارجو */}
           <button
             onClick={() => handleSelectRole("job_seeker")}
             disabled={loadingRole !== null}
@@ -103,7 +109,6 @@ export default function OnboardingPage() {
             )}
           </button>
 
-          {/* کارت کارفرما */}
           <button
             onClick={() => handleSelectRole("employer")}
             disabled={loadingRole !== null}
@@ -118,7 +123,7 @@ export default function OnboardingPage() {
             </div>
             <h2 className="text-2xl font-bold text-slate-900">من کارفرما هستم</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-500">
-              به دنبال استخدام بهترین استعدادها برای شرکت و تیم توسعه خود هستم.
+              به دنبال استخدام بهترین استعدادها برای شرکت و تیم توسعه خود هستم. <span className="block mt-1 font-bold text-primary">(۱ آگهی رایگان هدیه)</span>
             </p>
 
             {loadingRole === "employer" && (

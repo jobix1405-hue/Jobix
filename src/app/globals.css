@@ -28,3 +28,23 @@
     font-family: var(--font-vazirmatn);
   }
 }
+
+/* =========================================
+   تنظیمات مخصوص چاپ و خروجی PDF (رزومه)
+========================================= */
+@media print {
+  @page {
+    size: A4;
+    margin: 0; /* حذف حاشیه‌های پیش‌فرض مرورگر */
+  }
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: white !important;
+  }
+  /* مخفی کردن آدرس سایت و تاریخ در هدر و فوتر PDF */
+  @page {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}

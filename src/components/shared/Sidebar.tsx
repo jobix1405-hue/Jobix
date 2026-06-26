@@ -14,7 +14,10 @@ import {
   X,
   Bookmark, 
   ShieldCheck, 
-  Building 
+  CreditCard,
+  Layers,
+  Package,
+  AlertTriangle // 👈 آیکون اضافه شده برای گزارشات تخلف
 } from "lucide-react";
 
 interface SidebarItem {
@@ -23,7 +26,6 @@ interface SidebarItem {
   icon: React.ElementType;
 }
 
-// 🔥 اضافه شدن نقش admin به تایپ‌ها
 interface SidebarProps {
   role: "employer" | "job-seeker" | "admin"; 
 }
@@ -42,7 +44,7 @@ export function Sidebar({ role }: SidebarProps) {
     router.refresh();
   };
 
-  // 🔥 تنظیم لینک‌های اختصاصی بر اساس هر سه نقش
+  // تنظیم لینک‌های اختصاصی بر اساس هر سه نقش
   let links: SidebarItem[] = [];
   
   if (role === "admin") {
@@ -51,6 +53,10 @@ export function Sidebar({ role }: SidebarProps) {
       { name: "مدیریت شرکت‌ها", href: "/admin/companies", icon: ShieldCheck },
       { name: "مدیریت آگهی‌ها", href: "/admin/jobs", icon: Briefcase },
       { name: "کاربران پلتفرم", href: "/admin/users", icon: Users },
+      { name: "دسته‌بندی‌های شغلی", href: "/admin/categories", icon: Layers },
+      { name: "مدیریت تعرفه‌ها", href: "/admin/packages", icon: Package },
+      { name: "گزارشات مالی", href: "/admin/transactions", icon: CreditCard },
+      { name: "گزارشات تخلف", href: "/admin/reports", icon: AlertTriangle }, // 👈 لینک جدید مدیریت گزارشات
     ];
   } else if (role === "employer") {
     links = [
@@ -100,7 +106,6 @@ export function Sidebar({ role }: SidebarProps) {
         {/* لینک‌های منو */}
         <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
           {links.map((link) => {
-            // این لاجیک برای اینه که اگه ادمین رفت تو زیرمجموعه یک منو، باز هم دکمه منو روشن بمونه
             const isActive = pathname === link.href || (pathname.startsWith(link.href + '/') && link.href !== '/admin' && link.href !== '/employer' && link.href !== '/job-seeker');
             
             return (

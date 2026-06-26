@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -144,7 +145,7 @@ export default function ResumeBuilderPage() {
   return (
     <div className="mx-auto max-w-4xl animate-in fade-in duration-500">
       
-      {/* هدر صفحه */}
+      {/* هدر صفحه (شامل دکمه جدید برای مشاهده PDF) */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">رزومه من</h1>
@@ -153,13 +154,22 @@ export default function ResumeBuilderPage() {
           </p>
         </div>
         
-        {/* پیام موفقیت ذخیره */}
-        {isSuccess && (
-          <div className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-2 text-sm font-medium text-green-700 border border-green-100 animate-in slide-in-from-left-4">
-            <CheckCircle2 className="h-5 w-5" />
-            تغییرات با موفقیت ذخیره شد
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {/* دکمه مشاهده رزومه پابلیک */}
+          <Link href={`/resume/${user?.id}`} target="_blank">
+            <Button variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary hover:text-white">
+              مشاهده رزومه آنلاین (PDF)
+            </Button>
+          </Link>
+
+          {/* پیام موفقیت ذخیره */}
+          {isSuccess && (
+            <div className="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-2 text-sm font-medium text-green-700 border border-green-100 animate-in slide-in-from-left-4 h-10">
+              <CheckCircle2 className="h-5 w-5" />
+              ذخیره شد
+            </div>
+          )}
+        </div>
       </div>
 
       {errorMessage && (

@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   FileText,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
@@ -144,7 +145,10 @@ export default function EmployerDashboard() {
       {/* هدر داشبورد */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">سلام، {companyName} 👋</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+            سلام، {companyName}
+            <Sparkles className="h-6 w-6 text-amber-500 animate-pulse" />
+          </h1>
           <p className="mt-2 text-sm text-slate-500">
             به پنل مدیریت آگهی‌ها و استخدام خوش آمدید.
           </p>

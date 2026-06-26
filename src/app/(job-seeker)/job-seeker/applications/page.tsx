@@ -227,7 +227,7 @@ export default function ApplicationsTrackerPage() {
                     {app.logoUrl ? (
                       <img src={app.logoUrl} alt={app.company} className="h-full w-full object-cover" />
                     ) : (
-                      app.company.charAt(0)
+                      <Building2 className="h-6 w-6" />
                     )}
                   </div>
                   <div>

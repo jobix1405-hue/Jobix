@@ -265,7 +265,7 @@ export default function JobSeekerDashboard() {
                 <div key={app.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors gap-4">
                   <div className="flex items-start gap-4">
                     <div className="h-12 w-12 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center text-lg font-bold text-slate-400">
-                      {app.company.charAt(0)}
+                      <Building2 className="h-6 w-6" />
                     </div>
                     <div>
                       <h4 className="font-bold text-slate-900">{app.role}</h4>

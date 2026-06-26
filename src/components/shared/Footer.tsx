@@ -33,13 +33,15 @@ export function Footer() {
           
           {/* بخش معرفی و لوگو */}
           <div className="space-y-8 xl:col-span-1">
-            <Image
-              src="/logo-full.webp"
-              alt="جابیکس"
-              width={160}
-              height={50}
-              className="object-contain"
-            />
+            <Link href="/">
+              <Image
+                src="/logo-full.webp"
+                alt="جابیکس"
+                width={160}
+                height={50}
+                className="object-contain"
+              />
+            </Link>
             <p className="text-sm leading-relaxed text-slate-500 max-w-xs">
               جابیکس، هوشمندترین پلتفرم کاریابی و استخدام در ایران است که با استفاده از هوش مصنوعی، بهترین استعدادها را به بهترین شرکت‌ها متصل می‌کند.
             </p>
@@ -62,31 +64,32 @@ export function Footer() {
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 text-right">کارجویان</h3>
                 <ul role="list" className="mt-6 space-y-4 text-right">
-                  <li><Link href="/jobs" className="text-sm text-slate-500 hover:text-primary">جستجوی مشاغل</Link></li>
-                  <li><Link href="/job-seeker" className="text-sm text-slate-500 hover:text-primary">رزومه‌ساز آنلاین</Link></li>
-                  <li><Link href="#" className="text-sm text-slate-500 hover:text-primary">شرکت‌های برتر</Link></li>
+                  <li><Link href="/jobs" className="text-sm text-slate-500 hover:text-primary transition-colors">جستجوی مشاغل</Link></li>
+                  <li><Link href="/job-seeker/resume" className="text-sm text-slate-500 hover:text-primary transition-colors">رزومه‌ساز آنلاین</Link></li>
+                  <li><Link href="/companies" className="text-sm text-slate-500 hover:text-primary transition-colors">شرکت‌های برتر</Link></li>
                 </ul>
               </div>
               <div className="mt-10 md:mt-0">
                 <h3 className="text-sm font-semibold text-slate-900 text-right">کارفرمایان</h3>
                 <ul role="list" className="mt-6 space-y-4 text-right">
-                  <li><Link href="/employer" className="text-sm text-slate-500 hover:text-primary">ثبت آگهی استخدام</Link></li>
-                  <li><Link href="#" className="text-sm text-slate-500 hover:text-primary">تعرفه‌ها</Link></li>
-                  <li><Link href="#" className="text-sm text-slate-500 hover:text-primary">جستجوی رزومه‌ها</Link></li>
+                  <li><Link href="/employer/post-job" className="text-sm text-slate-500 hover:text-primary transition-colors">ثبت آگهی استخدام</Link></li>
+                  <li><Link href="/pricing" className="text-sm text-slate-500 hover:text-primary transition-colors">تعرفه‌ها</Link></li>
+                  <li><Link href="/employer" className="text-sm text-slate-500 hover:text-primary transition-colors">پنل مدیریت رزومه‌ها</Link></li>
                 </ul>
               </div>
             </div>
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 text-right">پشتیبانی</h3>
+                <h3 className="text-sm font-semibold text-slate-900 text-right">پشتیبانی و قوانین</h3>
                 <ul role="list" className="mt-6 space-y-4 text-right">
-                  <li><Link href="#" className="text-sm text-slate-500 hover:text-primary">سوالات متداول</Link></li>
-                  <li><Link href="#" className="text-sm text-slate-500 hover:text-primary">قوانین و مقررات</Link></li>
-                  <li><Link href="#" className="text-sm text-slate-500 hover:text-primary">حریم خصوصی</Link></li>
+                  <li><Link href="/about" className="text-sm text-slate-500 hover:text-primary transition-colors">درباره ما</Link></li>
+                  <li><Link href="/faq" className="text-sm text-slate-500 hover:text-primary transition-colors">سوالات متداول</Link></li>
+                  <li><Link href="/terms" className="text-sm text-slate-500 hover:text-primary transition-colors">قوانین و مقررات</Link></li>
+                  <li><Link href="/privacy" className="text-sm text-slate-500 hover:text-primary transition-colors">حریم خصوصی</Link></li>
                 </ul>
               </div>
               <div className="mt-10 md:mt-0 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-900 text-right">تماس با ما</h3>
+                <h3 className="text-sm font-semibold text-slate-900 text-right">ارتباط با ما</h3>
                 <ul className="mt-6 space-y-4">
                   <li className="flex items-center gap-2 text-sm text-slate-500">
                     <Phone className="h-4 w-4 shrink-0 text-slate-400" />
@@ -94,11 +97,11 @@ export function Footer() {
                   </li>
                   <li className="flex items-center gap-2 text-sm text-slate-500">
                     <Mail className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span dir="ltr">info@jobix.ir</span>
+                    <a href="mailto:info@jobixx.ir" className="hover:text-primary transition-colors" dir="ltr">info@jobixx.ir</a>
                   </li>
                   <li className="flex items-start gap-2 text-sm text-slate-500">
                     <MapPin className="h-5 w-5 shrink-0 text-slate-400 mt-0.5" />
-                    <span>تهران، پارک فناوری پردیس، ساختمان جابیکس</span>
+                    <span><Link href="/contact" className="hover:text-primary transition-colors">تهران، پارک فناوری پردیس، ساختمان جابیکس</Link></span>
                   </li>
                 </ul>
               </div>
@@ -108,7 +111,7 @@ export function Footer() {
         
         <div className="mt-16 border-t border-slate-200 pt-8 sm:mt-20 lg:mt-24">
           <p className="text-xs leading-5 text-slate-500 text-center">
-            &copy; {new Date().toLocaleDateString('fa-IR', { year: 'numeric' })} تمامی حقوق برای پلتفرم جابیکس محفوظ است.
+            &copy; {new Date().toLocaleDateString('fa-IR', { year: 'numeric' })} تمامی حقوق برای پلتفرم هوشمند کاریابی جابیکس محفوظ است.
           </p>
         </div>
       </div>

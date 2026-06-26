@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
-// کامپوننت اصلی فرم
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextUrl = searchParams.get('next'); // خوندن پارامتر مقصد
+  const nextUrl = searchParams.get('next'); 
+  const isBannedError = searchParams.get('error') === 'banned';
+  
   const supabase = createClient();
   const { setUser } = useStore();
 
@@ -24,27 +25,27 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const formatPhoneNumber = (phone: string) => {
-    let formatted = phone.trim();
-    if (formatted.startsWith("0")) {
-      formatted = "+98" + formatted.substring(1);
-    } else if (!formatted.startsWith("+")) {
-      formatted = "+98" + formatted;
+  useEffect(() => {
+    if (isBannedError) {
+      supabase.auth.signOut().then(() => setUser(null));
     }
-    return formatted;
-  };
+  }, [isBannedError, supabase, setUser]);
 
+  // 🔥 ارسال درخواست کد تایید
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (phoneNumber.length < 10 || phoneNumber.length > 11) {
-      setErrorMessage("لطفاً یک شماره موبایل معتبر وارد کنید.");
+    // اعتبارسنجی استاندارد ایران: دقیقاً ۱۱ رقم و شروع با 09
+    if (!phoneNumber.startsWith("09") || phoneNumber.length !== 11) {
+      setErrorMessage("شماره موبایل باید ۱۱ رقمی باشد و با 09 شروع شود (مثلاً 09123456789)");
       return;
     }
     
     setIsLoading(true);
-    const formattedPhone = formatPhoneNumber(phoneNumber);
+    
+    // تبدیل 09123456789 به +989123456789 برای سوپابیس به صورت کاملاً خودکار
+    const formattedPhone = "+98" + phoneNumber.substring(1);
 
     try {
       const { error } = await supabase.auth.signInWithOtp({ 
@@ -53,7 +54,7 @@ function LoginForm() {
 
       if (error) {
         console.error("OTP Send Error:", error.message);
-        setErrorMessage("خطا در ارسال پیامک. لطفاً دقایقی دیگر تلاش کنید یا شماره را بررسی کنید.");
+        setErrorMessage("خطا در ارسال پیامک. لطفاً شماره را بررسی کنید.");
       } else {
         setStep(2); 
       }
@@ -64,6 +65,7 @@ function LoginForm() {
     }
   };
 
+  // 🔥 تایید کد
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -74,7 +76,7 @@ function LoginForm() {
     }
     
     setIsLoading(true);
-    const formattedPhone = formatPhoneNumber(phoneNumber);
+    const formattedPhone = "+98" + phoneNumber.substring(1);
 
     try {
       const { data, error } = await supabase.auth.verifyOtp({
@@ -90,41 +92,48 @@ function LoginForm() {
         
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, is_banned')
           .eq('id', data.user.id)
           .single();
+
+        if (profile?.is_banned) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setStep(1);
+          setOtp("");
+          router.replace('/login?error=banned');
+          return;
+        }
+
+        setUser({
+          id: data.user.id,
+          phone: data.user.phone || '',
+          role: profile?.role || null
+        });
 
         router.refresh();
 
         if (profile?.role) {
-          // 🔥 تغییر مهم: مسیردهی داینامیک بر اساس نقش ادمین، کارفرما یا کارجو
           let redirectUrl = '/job-seeker';
           if (profile.role === 'admin') redirectUrl = '/admin';
           else if (profile.role === 'employer') redirectUrl = '/employer';
 
           router.push(nextUrl || redirectUrl);
         } else {
-          // 🔥 تخصیص هوشمند نقش بر اساس نیت کاربر (Intent)
           let intendedRole: "employer" | "job_seeker" | null = null;
           
           if (nextUrl?.includes('employer')) intendedRole = 'employer';
           else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
 
           if (intendedRole) {
-            // ۱. نقش رو در دیتابیس آپدیت کن
             await supabase.from('profiles').update({ role: intendedRole }).eq('id', data.user.id);
-            
-            // ۲. آپدیت استیت گلوبال
             setUser({
               id: data.user.id,
               phone: data.user.phone || '',
               role: intendedRole
             });
-            
-            // ۳. هدایت مستقیم بدون صفحه اضافی
             router.push(nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker'));
           } else {
-            // فقط اگه کاربر مستقیم زده بود روی دکمه لاگین سایت، بره Onboarding
             router.push('/onboarding');
           }
         }
@@ -141,12 +150,12 @@ function LoginForm() {
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-xl shadow-slate-200/50 sm:max-w-sm lg:max-w-md border border-slate-100 relative">
         
         {isLoading && (
-          <div className="absolute top-0 left-0 h-1 w-full bg-slate-100 overflow-hidden">
+          <div className="absolute top-0 left-0 h-1 w-full bg-slate-100 overflow-hidden z-10">
             <div className="h-full bg-primary w-1/2 animate-[progress_1s_ease-in-out_infinite]"></div>
           </div>
         )}
 
-        <div className="p-8 sm:p-10">
+        <div className="p-8 sm:p-10 relative">
           
           <div className="mb-8 flex justify-center">
             <Link href="/" className="transition-transform hover:scale-105">
@@ -160,6 +169,14 @@ function LoginForm() {
               />
             </Link>
           </div>
+
+          {isBannedError && (
+            <div className="mb-6 flex flex-col items-center justify-center gap-2 rounded-2xl bg-red-50 p-4 text-center border border-red-100 animate-in fade-in zoom-in duration-500">
+              <ShieldAlert className="h-8 w-8 text-red-500 mb-1" />
+              <p className="text-sm font-bold text-red-700">حساب کاربری شما مسدود شده است!</p>
+              <p className="text-xs text-red-600">به دلیل نقض قوانین پلتفرم، امکان ورود به حساب را ندارید.</p>
+            </div>
+          )}
 
           {errorMessage && (
             <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-600 border border-red-100 animate-in fade-in slide-in-from-top-2">
@@ -181,21 +198,54 @@ function LoginForm() {
                 <Input
                   type="tel"
                   dir="ltr"
-                  placeholder="0912 345 6789"
+                  placeholder="09123456789"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="text-center text-xl tracking-widest h-14"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setPhoneNumber(val);
+                  }}
+                  className="text-center text-2xl tracking-[0.2em] h-14 font-semibold text-slate-700"
                   maxLength={11}
                   disabled={isLoading}
                   autoFocus
                 />
+
+                {/* 🔥 دکمه‌های مخصوص تست برای صاحب‌کار */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <span className="block text-[10px] text-slate-400 text-center mb-2 font-medium">ورود سریع با شماره‌های تستی:</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPhoneNumber("09010601610")}
+                        className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-2 rounded-lg hover:bg-purple-100 transition-colors"
+                      >
+                        تست ادمین
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPhoneNumber("09222222222")}
+                        className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        تست کارفرما
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPhoneNumber("09333333333")}
+                        className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-100 px-2 py-2 rounded-lg hover:bg-orange-100 transition-colors"
+                      >
+                        تست کارجو
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12 text-lg rounded-xl shadow-lg shadow-primary/20"
+                className="w-full h-12 text-lg rounded-xl shadow-lg shadow-primary/20 transition-all"
                 isLoading={isLoading}
-                disabled={phoneNumber.length < 10 || isLoading}
+                disabled={phoneNumber.length !== 11 || isLoading}
               >
                 تایید و دریافت کد
               </Button>
@@ -221,17 +271,29 @@ function LoginForm() {
                   placeholder="-  -  -  -  -  -"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="text-center text-3xl tracking-[0.3em] h-14 font-bold"
+                  className="text-center text-3xl tracking-[0.3em] h-14 font-bold text-slate-700"
                   maxLength={6} 
                   disabled={isLoading}
                   autoFocus
                 />
+                
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setOtp("123456")}
+                      className="text-xs font-bold text-primary bg-primary/10 px-4 py-2 rounded-lg hover:bg-primary/20 transition-colors"
+                    >
+                      وارد کردن خودکار کد تستی (123456)
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-4 pt-2">
                 <Button
                   type="submit"
-                  className="w-full h-12 text-lg rounded-xl shadow-lg shadow-primary/20"
+                  className="w-full h-12 text-lg rounded-xl shadow-lg shadow-primary/20 transition-all"
                   isLoading={isLoading}
                   disabled={otp.length < 4 || isLoading}
                 >
@@ -258,7 +320,7 @@ function LoginForm() {
         </div>
 
         <div className="bg-slate-50 py-4 text-center text-xs text-slate-500 border-t border-slate-100">
-          با ورود به جابیکس، <Link href="#" className="font-semibold text-slate-700 hover:text-primary transition-colors">شرایط و قوانین</Link> آن را می‌پذیرم.
+          با ورود به جابیکس، <Link href="/terms" className="font-semibold text-slate-700 hover:text-primary transition-colors">شرایط و قوانین</Link> آن را می‌پذیرم.
         </div>
       </div>
 
@@ -272,7 +334,6 @@ function LoginForm() {
   );
 }
 
-// چون از useSearchParams استفاده می‌کنیم، کل فرم باید در Suspense رپ بشه
 export default function LoginPage() {
   return (
     <Suspense fallback={

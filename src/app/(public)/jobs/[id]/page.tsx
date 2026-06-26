@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { 
   Building2, MapPin, Briefcase, Clock, DollarSign, 
-  ChevronRight, Share2, Bookmark, CheckCircle2, AlertCircle, Loader2
+  ChevronRight, Share2, Bookmark, CheckCircle2, AlertCircle, Loader2, Flag
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
@@ -60,6 +61,13 @@ export default function SingleJobPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [isSavingLoading, setIsSavingLoading] = useState(false);
 
+  // استیت‌های مودال گزارش تخلف
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDesc, setReportDesc] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
   // واکشی اطلاعات آگهی و وضعیت ذخیره بودن
   useEffect(() => {
     const fetchJobData = async () => {
@@ -74,10 +82,10 @@ export default function SingleJobPage() {
         if (jobError) throw jobError;
         setJobDetails(jobData);
 
-        // آپدیت کردن تعداد بازدیدهای آگهی
+        // 🚨 تغییر امنیتی: استفاده از RPC برای افزایش بازدید بصورت امن و جلوگیری از تقلب 🚨
         if (jobData) {
           try {
-            await supabase.from('jobs').update({ views: (jobData.views || 0) + 1 }).eq('id', jobData.id);
+            await supabase.rpc('increment_job_view', { p_job_id: jobData.id });
           } catch (updateError) {
             console.error("Error updating views:", updateError);
           }
@@ -185,7 +193,7 @@ export default function SingleJobPage() {
     }
   };
 
-  // هندلر اشتراک‌گذاری (Web Share API)
+  // هندلر اشتراک‌گذاری
   const handleShare = async () => {
     const shareData = {
       title: `استخدام ${jobDetails.title} در ${jobDetails.profiles?.company_name}`,
@@ -197,12 +205,42 @@ export default function SingleJobPage() {
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        // کپی در کلیپ‌بورد برای مرورگرهایی که پشتیبانی نمی‌کنند (مثل دسکتاپ‌های قدیمی)
+        // کپی در کلیپ‌بورد برای مرورگرهایی که پشتیبانی نمی‌کنند
         await navigator.clipboard.writeText(window.location.href);
         alert("لینک آگهی در حافظه کپی شد.");
       }
     } catch (err) {
       console.error("Error sharing:", err);
+    }
+  };
+
+  // هندلر ثبت گزارش تخلف
+  const handleReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return router.push(`/login?next=/jobs/${params.id}`);
+    if (!reportReason) return alert("لطفاً دلیل گزارش را انتخاب کنید.");
+
+    setIsReporting(true);
+    try {
+      const { error } = await supabase.from('reports').insert({
+        job_id: jobDetails.id,
+        reporter_id: user.id,
+        reason: reportReason,
+        description: reportDesc
+      });
+      if (error) throw error;
+      
+      setReportSuccess(true);
+      setTimeout(() => {
+        setIsReportModalOpen(false);
+        setReportSuccess(false);
+        setReportReason("");
+        setReportDesc("");
+      }, 3000);
+    } catch (err) {
+      alert("خطا در ثبت گزارش.");
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -254,8 +292,12 @@ export default function SingleJobPage() {
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
                   <div className="flex items-end gap-6 -mt-10">
                     {/* لوگو شرکت */}
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-white border-4 border-white shadow-md text-4xl font-bold text-primary overflow-hidden">
-                      {logo ? <img src={logo} alt="logo" className="w-full h-full object-cover"/> : companyName.charAt(0)}
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-white border-4 border-white shadow-md overflow-hidden">
+                      {logo ? (
+                        <img src={logo} alt="logo" className="w-full h-full object-cover"/>
+                      ) : (
+                        <Building2 className="h-12 w-12 text-slate-400" />
+                      )}
                     </div>
                     <div className="mb-2">
                       <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">
@@ -363,8 +405,12 @@ export default function SingleJobPage() {
               </h3>
               
               <div className="flex items-center gap-4 mb-6">
-                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-2xl font-bold text-slate-400 overflow-hidden">
-                  {logo ? <img src={logo} alt="logo" className="w-full h-full object-cover"/> : companyName.charAt(0)}
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 overflow-hidden">
+                  {logo ? (
+                    <img src={logo} alt="logo" className="w-full h-full object-cover"/>
+                  ) : (
+                    <Building2 className="h-8 w-8 text-slate-400" />
+                  )}
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">{companyName}</h4>
@@ -410,6 +456,15 @@ export default function SingleJobPage() {
               >
                 ارسال رزومه برای این شغل
               </Button>
+
+              {/* دکمه گزارش تخلف */}
+              <button 
+                onClick={() => setIsReportModalOpen(true)}
+                className="w-full mt-4 flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-700 transition-colors py-2"
+              >
+                <Flag className="h-4 w-4" /> گزارش مشکل در آگهی
+              </button>
+
             </div>
           </aside>
 
@@ -431,7 +486,6 @@ export default function SingleJobPage() {
         title={applySuccess ? "درخواست با موفقیت ارسال شد" : "ارسال درخواست همکاری"}
       >
         {applySuccess ? (
-          // حالت موفقیت آمیز بودن ارسال
           <div className="flex flex-col items-center justify-center py-6 text-center animate-in fade-in zoom-in duration-300">
             <div className="mb-4 rounded-full bg-green-100 p-3">
               <CheckCircle2 className="h-12 w-12 text-green-600" />
@@ -451,11 +505,14 @@ export default function SingleJobPage() {
             </Button>
           </div>
         ) : (
-          // فرم ارسال درخواست
           <form onSubmit={handleApply} className="space-y-5">
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 flex gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-primary font-bold shadow-sm overflow-hidden">
-                {logo ? <img src={logo} alt="logo" className="w-full h-full object-cover"/> : companyName.charAt(0)}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm overflow-hidden border border-slate-200">
+                {logo ? (
+                  <img src={logo} alt="logo" className="w-full h-full object-cover"/>
+                ) : (
+                  <Building2 className="h-5 w-5 text-slate-400" />
+                )}
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-900">{jobDetails.title}</h4>
@@ -499,6 +556,67 @@ export default function SingleJobPage() {
                 isLoading={isSubmitting}
               >
                 تایید و ارسال رزومه
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ==============================================
+          مودال (پاپ‌آپ) گزارش تخلف
+          ============================================== */}
+      <Modal 
+        isOpen={isReportModalOpen} 
+        onClose={() => !isReporting && setIsReportModalOpen(false)} 
+        title="گزارش آگهی نامناسب"
+      >
+        {reportSuccess ? (
+          <div className="text-center py-6">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-green-600 mb-4" />
+            <h3 className="font-bold text-slate-900">گزارش شما ثبت شد</h3>
+            <p className="text-sm text-slate-500 mt-2">مدیریت جابیکس به زودی این مورد را بررسی خواهد کرد.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleReport} className="space-y-4 pt-2">
+            <div className="rounded-lg bg-orange-50 border border-orange-100 p-3 text-xs text-orange-800 mb-4">
+              در صورت مشاهده درخواست وجه، کلاهبرداری، اطلاعات دروغین یا رفتار نامناسب، مراتب را گزارش دهید.
+            </div>
+            
+            <Select 
+              label="دلیل گزارش *"
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              options={[
+                { value: "scam", label: "کلاهبرداری یا درخواست وجه" },
+                { value: "fake", label: "آگهی دروغین یا شرکت نامعتبر" },
+                { value: "inappropriate", label: "محتوای نامناسب یا توهین‌آمیز" },
+                { value: "other", label: "سایر موارد" },
+              ]}
+            />
+            
+            <Textarea 
+              label="توضیحات بیشتر (اختیاری)"
+              value={reportDesc}
+              onChange={(e) => setReportDesc(e.target.value)}
+              placeholder="لطفا جزئیات را بنویسید..."
+            />
+            
+            <div className="flex gap-3 pt-2">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="flex-1"
+                onClick={() => setIsReportModalOpen(false)}
+                disabled={isReporting}
+              >
+                انصراف
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white" 
+                isLoading={isReporting}
+              >
+                ثبت گزارش
               </Button>
             </div>
           </form>

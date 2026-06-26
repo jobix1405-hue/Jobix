@@ -173,7 +173,7 @@ export default function SavedJobsPage() {
                     {job.logoUrl ? (
                       <img src={job.logoUrl} alt={job.companyName} className="h-full w-full object-cover" />
                     ) : (
-                      job.companyName.charAt(0)
+                      <Building2 className="h-6 w-6" />
                     )}
                   </div>
                   <div>
