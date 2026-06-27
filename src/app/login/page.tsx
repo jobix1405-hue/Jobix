@@ -25,13 +25,14 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // در صورت مسدود بودن، کاربر را خارج می‌کنیم
   useEffect(() => {
     if (isBannedError) {
       supabase.auth.signOut().then(() => setUser(null));
     }
   }, [isBannedError, supabase, setUser]);
 
-  // درخواست کد تایید
+  // ۱. درخواست کد تایید
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -62,7 +63,7 @@ function LoginForm() {
     }
   };
 
-  // تایید کد
+  // ۲. تایید کد
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -87,13 +88,14 @@ function LoginForm() {
         setErrorMessage("کد وارد شده اشتباه است یا منقضی شده.");
       } else if (data.user) {
         
-        // استفاده از maybeSingle برای جلوگیری از ارور وقتی کاربر تازه ثبت‌نام کرده
+        // استفاده از maybeSingle برای جلوگیری از ارور (چون تریگر در حال ساخت است)
         const { data: profile } = await supabase
           .from('profiles')
           .select('role, is_banned')
           .eq('id', data.user.id)
           .maybeSingle();
 
+        // اگر کاربر مسدود بود، بیرونش می‌اندازیم
         if (profile?.is_banned) {
           await supabase.auth.signOut();
           setUser(null);
@@ -103,6 +105,7 @@ function LoginForm() {
           return;
         }
 
+        // تنظیم State لاگین
         setUser({
           id: data.user.id,
           phone: data.user.phone || '',
@@ -111,6 +114,7 @@ function LoginForm() {
 
         router.refresh();
 
+        // مسیردهی هوشمند
         if (profile?.role) {
           let redirectUrl = '/job-seeker';
           if (profile.role === 'admin') redirectUrl = '/admin';
@@ -118,18 +122,18 @@ function LoginForm() {
 
           router.push(nextUrl || redirectUrl);
         } else {
+          // اگر نقش نداشت اما در url قصد ورود به پنل خاصی رو داشت
           let intendedRole: "employer" | "job_seeker" | null = null;
           
           if (nextUrl?.includes('employer')) intendedRole = 'employer';
           else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
 
           if (intendedRole) {
-            // 🔥 تغییر کلیدی: استفاده از upsert در لاگین هم در صورت نیاز
-            await supabase.from('profiles').upsert({ 
-              id: data.user.id, 
-              role: intendedRole,
-              phone_number: data.user.phone 
-            });
+            // آپدیت پروفایلی که تریگر دیتابیس ساخته است با نقش جدید
+            await supabase.from('profiles').update({ 
+              role: intendedRole
+            }).eq('id', data.user.id);
+            
             setUser({
               id: data.user.id,
               phone: data.user.phone || '',
@@ -137,6 +141,7 @@ function LoginForm() {
             });
             router.push(nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker'));
           } else {
+            // اگر مقصدی نداشت بره به صفحه انتخاب نقش
             router.push('/onboarding');
           }
         }

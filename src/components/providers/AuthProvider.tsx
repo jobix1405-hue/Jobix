@@ -16,12 +16,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          // واکشی پروفایل از دیتابیس (برای تشخیص نقش کاربر)
+          // واکشی پروفایل از دیتابیس با استفاده از maybeSingle بجای single
+          // تا اگر کاربر تازه ثبت‌نام کرده و پروفایلش در حال ساخته شدن بود، برنامه کرش نکند
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
 
           setUser({
             id: session.user.id,
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
         setUser({
           id: session.user.id,

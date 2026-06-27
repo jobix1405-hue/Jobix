@@ -15,8 +15,8 @@ export default function OnboardingPage() {
   const [loadingRole, setLoadingRole] = useState<"job_seeker" | "employer" | null>(null);
 
   useEffect(() => {
+    // اگر کاربر لاگین بود و از قبل نقش داشت، به صفحه اشتباهی نیاید
     if (!isAuthLoading && user?.role) {
-      // هندل کردن روت ادمین برای مواردی که کاربر ادمین اشتباهاً وارد این صفحه شود
       const route = user.role === "admin" ? "/admin" : (user.role === "employer" ? "/employer" : "/job-seeker");
       router.replace(route);
     }
@@ -27,17 +27,15 @@ export default function OnboardingPage() {
     
     setLoadingRole(role);
     try {
-      // 🔥 تغییر کلیدی: استفاده از upsert برای ساخت کاربر در صورت عدم وجود
+      // بروزرسانی پروفایلی که توسط تریگر دیتابیس ساخته شده
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({ 
-          id: user.id, 
-          role: role,
-          phone_number: user.phone // اطمینان از ذخیره شماره موبایل
-        });
+        .update({ role: role })
+        .eq('id', user.id);
 
       if (profileError) throw profileError;
 
+      // اگر نقش کارفرما بود، یک آگهی رایگان ۳۰ روزه بهش هدیه میدیم
       if (role === "employer") {
         const expireDate = new Date();
         expireDate.setDate(expireDate.getDate() + 30);
@@ -52,6 +50,7 @@ export default function OnboardingPage() {
         if (subError) console.error("Error giving free job package:", subError);
       }
 
+      // تنظیم استیت و رفتن به پنل مربوطه
       setUser({ ...user, role });
       router.push(role === "employer" ? "/employer" : "/job-seeker");
       router.refresh();
@@ -63,6 +62,7 @@ export default function OnboardingPage() {
     }
   };
 
+  // تا زمانی که وضعیت لاگین چک نشده، چیزی رندر نمی‌کنیم
   if (isAuthLoading || user?.role) return null;
 
   return (
