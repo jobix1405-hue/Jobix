@@ -27,27 +27,36 @@ export default function OnboardingPage() {
     
     setLoadingRole(role);
     try {
-      // بروزرسانی پروفایلی که توسط تریگر دیتابیس ساخته شده
+      // 🔥 استفاده از UPSERT: اگر پروفایل نبود بساز، اگر بود آپدیت کن
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ role: role })
-        .eq('id', user.id);
+        .upsert({ 
+          id: user.id, 
+          role: role,
+          phone_number: user.phone || null // اضافه کردن شماره در صورت نیاز
+        });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        alert("خطای دیتابیس پروفایل: " + profileError.message);
+        throw profileError;
+      }
 
       // اگر نقش کارفرما بود، یک آگهی رایگان ۳۰ روزه بهش هدیه میدیم
       if (role === "employer") {
         const expireDate = new Date();
         expireDate.setDate(expireDate.getDate() + 30);
         
-        const { error: subError } = await supabase.from('employer_subscriptions').insert({
+        // استفاده از UPSERT برای هدیه آگهی تا ارور Duplicate ندهد
+        const { error: subError } = await supabase.from('employer_subscriptions').upsert({
           employer_id: user.id,
           total_jobs: 1, 
           used_jobs: 0,
           expires_at: expireDate.toISOString()
-        });
+        }, { onConflict: 'employer_id' });
         
-        if (subError) console.error("Error giving free job package:", subError);
+        if (subError) {
+          console.error("خطای دیتابیس در ثبت هدیه:", subError.message);
+        }
       }
 
       // تنظیم استیت و رفتن به پنل مربوطه
@@ -55,9 +64,9 @@ export default function OnboardingPage() {
       router.push(role === "employer" ? "/employer" : "/job-seeker");
       router.refresh();
       
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("خطایی در ثبت اطلاعات رخ داد. لطفاً دوباره تلاش کنید.");
+      alert("متاسفانه در ثبت اطلاعات خطایی رخ داد. کنسول مرورگر را بررسی کنید.");
       setLoadingRole(null);
     }
   };
