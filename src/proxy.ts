@@ -1,8 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+// 🔥 رفع ارور ورسل: حتماً باید default export باشد
+export default async function proxy(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
   // راه‌اندازی کلاینت سوپابیس برای خواندن کوکی‌ها در سرور
   const supabase = createServerClient(
@@ -15,7 +18,9 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({
+            request,
+          })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -25,12 +30,15 @@ export async function middleware(request: NextRequest) {
   )
 
   // دریافت اطلاعات کاربر فعلی
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.includes('employer') || pathname.includes('job-seeker')
+  const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.includes('employer') || pathname.includes('job-seeker');
 
-  // تابع کمکی برای انتقال کوکی‌ها به ریسپانس دایرکت شده
+  // 🔥 فیکس فوق‌العاده مهم: تابع کمکی برای انتقال کوکی‌ها به ریسپانس دایرکت شده
+  // اگر این نباشد، کوکی‌های سوپابیس در هنگام ریدایرکت پاک می‌شوند و کاربر دوباره لاگ‌اوت می‌شود
   const applyCookiesAndRedirect = (url: URL) => {
     const redirectRes = NextResponse.redirect(url)
     supabaseResponse.cookies.getAll().forEach((cookie) => {
@@ -53,7 +61,7 @@ export async function middleware(request: NextRequest) {
       .from('profiles')
       .select('role, is_banned')
       .eq('id', user.id)
-      .maybeSingle() // جلوگیری از کرش در صورت نبود پروفایل
+      .maybeSingle() // 🔥 جایگزین کردن single با maybeSingle تا باعث کرش (PGRST116) نشود
     
     // اگر کاربر مسدود شده بود
     if (profile?.is_banned) {
@@ -63,7 +71,7 @@ export async function middleware(request: NextRequest) {
       return applyCookiesAndRedirect(url)
     }
 
-    // اگر کاربر نقشی نداشت (ثبت‌نام ناقص بود)
+    // اگر کاربر نقشی نداشت (ثبت‌نام ناقص بود) به صفحه Onboarding فرستاده شود
     if (!profile?.role && !pathname.startsWith('/onboarding')) {
       const url = request.nextUrl.clone()
       url.pathname = '/onboarding'
@@ -73,7 +81,7 @@ export async function middleware(request: NextRequest) {
     // محافظت اختصاصی از مسیر ادمین
     if (pathname.startsWith('/admin') && profile?.role !== 'admin') {
       const url = request.nextUrl.clone()
-      url.pathname = '/'
+      url.pathname = '/' // اگر ادمین نبود، پرت بشه صفحه اصلی سایت
       return applyCookiesAndRedirect(url)
     }
   }
@@ -81,6 +89,7 @@ export async function middleware(request: NextRequest) {
   return supabaseResponse
 }
 
+// تنظیمات مچینگ: روی چه مسیرهایی این فایل اجرا بشه؟
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
