@@ -63,7 +63,7 @@ function LoginForm() {
     }
   };
 
-  // ۲. تایید کد
+  // ۲. تایید کد و هندلینگ پیشرفته پروفایل
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -88,14 +88,29 @@ function LoginForm() {
         setErrorMessage("کد وارد شده اشتباه است یا منقضی شده.");
       } else if (data.user) {
         
-        // استفاده از maybeSingle برای جلوگیری از ارور (چون تریگر در حال ساخت است)
-        const { data: profile } = await supabase
+        // ۱. واکشی پروفایل که به لطف تریگر جدید در دیتابیس قطعا ساخته شده است
+        let { data: profile } = await supabase
           .from('profiles')
           .select('role, is_banned')
           .eq('id', data.user.id)
           .maybeSingle();
 
-        // اگر کاربر مسدود بود، بیرونش می‌اندازیم
+        // ۲. برنامه‌نویسی تدافعی: اگر به ندرت تریگر دیتابیس با تاخیر مواجه شد، خودمان می‌سازیمش
+        if (!profile) {
+          const { error: insertError } = await supabase.from('profiles').insert({
+            id: data.user.id,
+            phone_number: data.user.phone || formattedPhone,
+            is_banned: false
+          });
+          
+          if (insertError) {
+            console.error("Fallback Insert Error:", insertError.message);
+          }
+          
+          profile = { role: null, is_banned: false };
+        }
+
+        // ۳. بررسی وضعیت مسدودی کاربر
         if (profile?.is_banned) {
           await supabase.auth.signOut();
           setUser(null);
@@ -105,16 +120,16 @@ function LoginForm() {
           return;
         }
 
-        // تنظیم State لاگین
+        // ۴. بروزرسانی استیت سراسری سیستم
         setUser({
           id: data.user.id,
-          phone: data.user.phone || '',
+          phone: data.user.phone || formattedPhone,
           role: profile?.role || null
         });
 
         router.refresh();
 
-        // مسیردهی هوشمند
+        // ۵. مسیردهی هوشمند بر اساس نقش (Role)
         if (profile?.role) {
           let redirectUrl = '/job-seeker';
           if (profile.role === 'admin') redirectUrl = '/admin';
@@ -122,31 +137,34 @@ function LoginForm() {
 
           router.push(nextUrl || redirectUrl);
         } else {
-          // اگر نقش نداشت اما در url قصد ورود به پنل خاصی رو داشت
+          // اگر کاربر نقشی نداشت (ثبت‌نام جدید)
           let intendedRole: "employer" | "job_seeker" | null = null;
           
           if (nextUrl?.includes('employer')) intendedRole = 'employer';
           else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
 
           if (intendedRole) {
-            // آپدیت پروفایلی که تریگر دیتابیس ساخته است با نقش جدید
-            await supabase.from('profiles').update({ 
+            // استفاده از upsert برای محکم‌کاری (اگر پروفایل بود آپدیت میکنه، اگر نبود میسازه)
+            await supabase.from('profiles').upsert({ 
+              id: data.user.id,
+              phone_number: data.user.phone || formattedPhone,
               role: intendedRole
-            }).eq('id', data.user.id);
+            });
             
             setUser({
               id: data.user.id,
-              phone: data.user.phone || '',
+              phone: data.user.phone || formattedPhone,
               role: intendedRole
             });
             router.push(nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker'));
           } else {
-            // اگر مقصدی نداشت بره به صفحه انتخاب نقش
+            // اگر از صفحه عادی اومده، بره صفحه آنبوردینگ برای انتخاب نقش
             router.push('/onboarding');
           }
         }
       }
     } catch (err) {
+      console.error(err);
       setErrorMessage("خطای ارتباط با سرور هنگام تایید کد.");
     } finally {
       setIsLoading(false);
