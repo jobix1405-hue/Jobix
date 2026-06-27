@@ -16,7 +16,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!isAuthLoading && user?.role) {
-      // 🔥 فیکس مهم: هندل کردن روت ادمین برای مواردی که کاربر ادمین اشتباهاً وارد این صفحه شود
+      // هندل کردن روت ادمین برای مواردی که کاربر ادمین اشتباهاً وارد این صفحه شود
       const route = user.role === "admin" ? "/admin" : (user.role === "employer" ? "/employer" : "/job-seeker");
       router.replace(route);
     }
@@ -27,10 +27,14 @@ export default function OnboardingPage() {
     
     setLoadingRole(role);
     try {
+      // 🔥 تغییر کلیدی: استفاده از upsert برای ساخت کاربر در صورت عدم وجود
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ role: role })
-        .eq('id', user.id);
+        .upsert({ 
+          id: user.id, 
+          role: role,
+          phone_number: user.phone // اطمینان از ذخیره شماره موبایل
+        });
 
       if (profileError) throw profileError;
 
@@ -50,6 +54,7 @@ export default function OnboardingPage() {
 
       setUser({ ...user, role });
       router.push(role === "employer" ? "/employer" : "/job-seeker");
+      router.refresh();
       
     } catch (err) {
       console.error(err);

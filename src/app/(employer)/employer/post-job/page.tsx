@@ -5,13 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { MapSelector } from "@/components/shared/MapSelector";
-import { Briefcase, CheckCircle2, MapPin, AlertCircle, Loader2, CreditCard, Lock, Layers } from "lucide-react";
+import { Briefcase, CheckCircle2, MapPin, AlertCircle, Loader2, Layers } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
@@ -51,7 +50,6 @@ export default function PostJobPage() {
 
   // استیت‌های دیتابیس
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
-  const [subscription, setSubscription] = useState<{ id: string, total: number, used: number } | null>(null);
   
   // استیت‌های مربوط به دسته‌بندی درختی
   const [allCategories, setAllCategories] = useState<any[]>([]);
@@ -96,21 +94,6 @@ export default function PostJobPage() {
         // ۱. واکشی کل دسته‌بندی‌ها (چون کلاً حدود 120 تاست، یکجا می‌گیریم که سرعت فرم بالا بره)
         const { data: catData } = await supabase.from('job_categories').select('id, title, level, parent_id');
         if (catData) setAllCategories(catData);
-
-        // ۲. واکشی سهمیه
-        const { data: subData, error: subError } = await supabase
-          .from('employer_subscriptions')
-          .select('id, total_jobs, used_jobs')
-          .eq('employer_id', user.id)
-          .single();
-
-        if (subError && subError.code !== 'PGRST116') throw subError;
-        
-        if (subData) {
-          setSubscription({ id: subData.id, total: subData.total_jobs, used: subData.used_jobs });
-        } else {
-          setSubscription({ id: 'none', total: 0, used: 0 });
-        }
       } catch (err) {
         console.error("خطا در دریافت اطلاعات اولیه:", err);
       } finally {
@@ -120,8 +103,6 @@ export default function PostJobPage() {
 
     fetchInitialData();
   }, [user?.id, supabase]);
-
-  const remainingJobs = subscription ? subscription.total - subscription.used : 0;
 
   // فیلتر کردن گزینه‌ها بر اساس دیتای درختی
   const level1Options = allCategories
@@ -142,8 +123,7 @@ export default function PostJobPage() {
   }
 
   const onSubmit = async (data: JobFormValues) => {
-    if (!user?.id || !subscription) return setErrorMessage("مشکلی در حساب کاربری وجود دارد!");
-    if (remainingJobs <= 0) return setErrorMessage("سهمیه ثبت آگهی شما به پایان رسیده است.");
+    if (!user?.id) return setErrorMessage("مشکلی در حساب کاربری وجود دارد!");
 
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -168,21 +148,22 @@ export default function PostJobPage() {
       }
 
       // =================================================================
-      // 🚨 آپدیت امنیتی: استفاده از تابع RPC برای ثبت آگهی و کسر سهمیه 🚨
+      // 🚨 ثبت مستقیم در جدول jobs (بدون چک کردن سهمیه و محدودیت) 🚨
       // =================================================================
-      const { error: rpcError } = await supabase.rpc('create_job_with_quota', {
-        p_employer_id: user.id,
-        p_title: data.title,
-        p_category: finalJobCategory,
-        p_job_type: data.jobType,
-        p_salary_range: data.salary,
-        p_location_text: data.location,
-        p_description: data.description,
-        p_lat: data.coordinates?.[0] || null,
-        p_lng: data.coordinates?.[1] || null
+      const { error: insertError } = await supabase.from('jobs').insert({
+        employer_id: user.id,
+        title: data.title,
+        category: finalJobCategory,
+        job_type: data.jobType,
+        salary_range: data.salary,
+        location_text: data.location,
+        description: data.description,
+        lat: data.coordinates?.[0] || null,
+        lng: data.coordinates?.[1] || null,
+        status: 'active' // آگهی به محض ثبت فعال میشه
       });
 
-      if (rpcError) throw rpcError;
+      if (insertError) throw insertError;
 
       setIsSuccess(true);
     } catch (err: any) {
@@ -210,31 +191,11 @@ export default function PostJobPage() {
         </div>
         <h2 className="text-2xl font-bold text-slate-900">آگهی شما با موفقیت ثبت شد!</h2>
         <p className="mt-2 text-slate-600 max-w-md leading-relaxed">
-          آگهی شما هم‌اکنون در سیستم فعال است و از سهمیه شما <span className="font-bold text-slate-900">۱ عدد</span> کسر شد.
+          آگهی شما هم‌اکنون در سیستم به صورت عمومی فعال است و کارجویان می‌توانند آن را مشاهده کنند.
         </p>
         <Button className="mt-8 rounded-xl px-8" onClick={() => router.push('/employer/jobs')}>
           مشاهده آگهی‌های من
         </Button>
-      </div>
-    );
-  }
-
-  if (remainingJobs <= 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 animate-in fade-in zoom-in duration-500">
-        <div className="mb-6 rounded-3xl bg-red-50 p-6 border border-red-100 shadow-inner">
-          <Lock className="h-16 w-16 text-red-500" />
-        </div>
-        <h2 className="text-2xl font-extrabold text-slate-900 mb-3">سهمیه ثبت آگهی شما به پایان رسیده است</h2>
-        <p className="text-slate-600 text-center max-w-md leading-relaxed mb-8">
-          برای ثبت آگهی‌های شغلی جدید و پیدا کردن بهترین استعدادها، باید یکی از بسته‌های اشتراک جابیکس را تهیه کنید.
-        </p>
-        <Link href="/employer/packages">
-          <Button size="lg" className="rounded-2xl px-10 h-14 text-lg shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
-            <CreditCard className="ml-2 h-5 w-5" />
-            مشاهده تعرفه‌ها و خرید بسته
-          </Button>
-        </Link>
       </div>
     );
   }
@@ -251,10 +212,10 @@ export default function PostJobPage() {
             اطلاعات شغل مورد نیاز خود را با دقت وارد کنید تا بهترین کارجویان را پیدا کنید.
           </p>
         </div>
-        <div className="bg-blue-50 border border-blue-100 px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm">
-          <span className="text-sm font-medium text-blue-800">سهمیه باقیمانده:</span>
-          <span className="text-lg font-extrabold text-primary bg-white px-3 py-0.5 rounded-lg border border-blue-100">
-            {remainingJobs}
+        <div className="bg-green-50 border border-green-100 px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm">
+          <span className="text-sm font-bold text-green-800">حالت تستی:</span>
+          <span className="text-sm font-extrabold text-green-700 bg-white px-3 py-0.5 rounded-lg border border-green-200">
+            ثبت رایگان و نامحدود
           </span>
         </div>
       </div>
@@ -382,7 +343,7 @@ export default function PostJobPage() {
             انصراف
           </Button>
           <Button type="submit" size="lg" isLoading={isSubmitting} className="rounded-xl px-8 shadow-lg shadow-primary/20">
-            کسر ۱ سهمیه و انتشار
+            ثبت و انتشار فوری آگهی
           </Button>
         </div>
 

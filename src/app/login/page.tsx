@@ -31,20 +31,17 @@ function LoginForm() {
     }
   }, [isBannedError, supabase, setUser]);
 
-  // 🔥 ارسال درخواست کد تایید
+  // درخواست کد تایید
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    // اعتبارسنجی استاندارد ایران: دقیقاً ۱۱ رقم و شروع با 09
     if (!phoneNumber.startsWith("09") || phoneNumber.length !== 11) {
       setErrorMessage("شماره موبایل باید ۱۱ رقمی باشد و با 09 شروع شود (مثلاً 09123456789)");
       return;
     }
     
     setIsLoading(true);
-    
-    // تبدیل 09123456789 به +989123456789 برای سوپابیس به صورت کاملاً خودکار
     const formattedPhone = "+98" + phoneNumber.substring(1);
 
     try {
@@ -65,7 +62,7 @@ function LoginForm() {
     }
   };
 
-  // 🔥 تایید کد
+  // تایید کد
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -90,11 +87,12 @@ function LoginForm() {
         setErrorMessage("کد وارد شده اشتباه است یا منقضی شده.");
       } else if (data.user) {
         
+        // استفاده از maybeSingle برای جلوگیری از ارور وقتی کاربر تازه ثبت‌نام کرده
         const { data: profile } = await supabase
           .from('profiles')
           .select('role, is_banned')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (profile?.is_banned) {
           await supabase.auth.signOut();
@@ -126,7 +124,12 @@ function LoginForm() {
           else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
 
           if (intendedRole) {
-            await supabase.from('profiles').update({ role: intendedRole }).eq('id', data.user.id);
+            // 🔥 تغییر کلیدی: استفاده از upsert در لاگین هم در صورت نیاز
+            await supabase.from('profiles').upsert({ 
+              id: data.user.id, 
+              role: intendedRole,
+              phone_number: data.user.phone 
+            });
             setUser({
               id: data.user.id,
               phone: data.user.phone || '',
@@ -210,7 +213,6 @@ function LoginForm() {
                   autoFocus
                 />
 
-                {/* 🔥 دکمه‌های مخصوص تست برای صاحب‌کار */}
                 {process.env.NODE_ENV === 'development' && (
                   <div className="mt-4 pt-4 border-t border-slate-100">
                     <span className="block text-[10px] text-slate-400 text-center mb-2 font-medium">ورود سریع با شماره‌های تستی:</span>
