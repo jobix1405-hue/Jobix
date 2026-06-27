@@ -9,18 +9,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
+    let mounted = true;
+
     // تابع بررسی وضعیت سشن در لحظه لود شدن سایت
     const initializeAuth = async () => {
       setIsAuthLoading(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (session?.user) {
-          // واکشی پروفایل از دیتابیس با استفاده از maybeSingle بجای single
-          // تا اگر کاربر تازه ثبت‌نام کرده و پروفایلش در حال ساخته شدن بود، برنامه کرش نکند
+        if (session?.user && mounted) {
+          // واکشی پروفایل از دیتابیس (برای تشخیص نقش کاربر)
           const { data: profile } = await supabase
             .from('profiles')
-            .select('*')
+            .select('role')
             .eq('id', session.user.id)
             .maybeSingle();
 
@@ -29,14 +30,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             phone: session.user.phone || '',
             role: profile?.role || null,
           });
-        } else {
+        } else if (mounted) {
           setUser(null);
         }
       } catch (error) {
         console.error("Auth Initialization Error:", error);
-        setUser(null);
+        if (mounted) setUser(null);
       } finally {
-        setIsAuthLoading(false);
+        if (mounted) setIsAuthLoading(false);
       }
     };
 
@@ -44,10 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // گوش دادن به تغییرات ورود و خروج به صورت لحظه‌ای
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       if (event === 'SIGNED_IN' && session?.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('role')
           .eq('id', session.user.id)
           .maybeSingle();
 
@@ -61,8 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Cleanup function
+    // Cleanup function برای جلوگیری از Memory Leak
     return () => {
+      mounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

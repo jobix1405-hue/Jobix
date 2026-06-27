@@ -1,17 +1,23 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogIn, LayoutDashboard, Menu, X } from 'lucide-react';
+import { LogIn, LayoutDashboard, Menu, X, UserCog, Briefcase, Building2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useStore } from '@/store/useStore';
 
 export function Header() {
   const { user, isAuthLoading } = useStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false); // 🔥 جلوگیری از خطای Hydration
   const pathname = usePathname();
+
+  // اطمینان از اینکه کامپوننت روی کلاینت مونت شده است
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // لینک‌های منوی ناوبری سایت
   const navLinks = [
@@ -21,13 +27,27 @@ export function Header() {
     { name: 'درباره ما', href: '/about' },
   ];
 
-  // 🔥 فیکس جدید: تعیین مسیر صحیح برای دکمه پنل
-  const getPanelUrl = () => {
-    if (!user?.role) return '/onboarding';
-    if (user.role === 'employer') return '/employer';
-    if (user.role === 'admin') return '/admin';
-    return '/job-seeker';
+  // 🔥 تابع هوشمند تشخیص مرحله و وضعیت کاربر
+  const getButtonState = () => {
+    if (!user) {
+      return { url: '/login', text: 'ورود / ثبت‌نام', icon: LogIn, variant: 'outline' as const };
+    }
+    // اگر کاربر لاگین است اما هنوز نقش انتخاب نکرده (گیر کرده در Onboarding)
+    if (!user.role) {
+      return { url: '/onboarding', text: 'تکمیل ثبت‌نام', icon: UserCog, variant: 'secondary' as const };
+    }
+    // اگر نقش مشخص است
+    if (user.role === 'employer') {
+      return { url: '/employer', text: 'پنل کارفرما', icon: Building2, variant: 'outline' as const };
+    }
+    if (user.role === 'admin') {
+      return { url: '/admin', text: 'پنل مدیریت', icon: ShieldCheck, variant: 'outline' as const };
+    }
+    return { url: '/job-seeker', text: 'پنل کارجو', icon: Briefcase, variant: 'outline' as const };
   };
+
+  const btnState = getButtonState();
+  const Icon = btnState.icon;
 
   return (
     <header className="absolute inset-x-0 top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -65,26 +85,21 @@ export function Header() {
         {/* بخش چپ: دکمه‌های ورود و همبرگر منو */}
         <div className="flex items-center gap-4">
           <div className="hidden sm:block">
-            {isAuthLoading ? (
-              <div className="h-10 w-36 rounded-full bg-slate-200 animate-pulse"></div>
-            ) : user ? (
-              <Link href={getPanelUrl()}>
-                <Button 
-                  variant="outline" 
-                  className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-primary shadow-sm transition-all duration-200 border-primary/20 hover:border-primary hover:bg-primary/5 hover:shadow-md"
-                >
-                  <LayoutDashboard className="ml-2 h-4 w-4" aria-hidden="true" />
-                  پنل کاربری
-                </Button>
-              </Link>
+            {/* اگر سایت در حال لود است یا هنوز مونت نشده، فقط یه اسکلتون نشون بده */}
+            {!mounted || isAuthLoading ? (
+              <div className="h-10 w-36 rounded-full bg-slate-100 animate-pulse border border-slate-200"></div>
             ) : (
-              <Link href="/login">
+              <Link href={btnState.url}>
                 <Button 
-                  variant="outline" 
-                  className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold shadow-sm transition-all duration-200 hover:border-[#f97316] hover:text-[#ea580c] hover:shadow-md"
+                  variant={btnState.variant} 
+                  className={`rounded-full px-5 py-2.5 text-sm font-bold shadow-sm transition-all duration-200 ${
+                    btnState.variant === 'outline' 
+                      ? 'bg-white text-primary border-primary/20 hover:border-primary hover:bg-primary/5 hover:shadow-md' 
+                      : 'shadow-secondary/20 hover:shadow-md'
+                  }`}
                 >
-                  <LogIn className="ml-2 h-4 w-4" aria-hidden="true" />
-                  ورود / ثبت نام
+                  <Icon className="ml-2 h-4 w-4" aria-hidden="true" />
+                  {btnState.text}
                 </Button>
               </Link>
             )}
@@ -117,18 +132,15 @@ export function Header() {
           ))}
           
           <div className="pt-2 sm:hidden">
-             {isAuthLoading ? (
-              <div className="h-12 w-full rounded-full bg-slate-200 animate-pulse"></div>
-            ) : user ? (
-              <Link href={getPanelUrl()} onClick={() => setIsMobileMenuOpen(false)}>
-                <Button className="w-full h-12 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white border-0 shadow-none">
-                  <LayoutDashboard className="ml-2 h-5 w-5" /> ورود به پنل کاربری
-                </Button>
-              </Link>
+             {!mounted || isAuthLoading ? (
+              <div className="h-12 w-full rounded-full bg-slate-100 animate-pulse border border-slate-200"></div>
             ) : (
-              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button className="w-full h-12 rounded-full bg-secondary text-white hover:bg-secondary/90 border-0 shadow-lg shadow-secondary/20">
-                  <LogIn className="ml-2 h-5 w-5" /> ورود / ثبت‌نام در جابیکس
+              <Link href={btnState.url} onClick={() => setIsMobileMenuOpen(false)}>
+                <Button 
+                  variant={btnState.variant === 'outline' ? 'primary' : btnState.variant}
+                  className="w-full h-12 rounded-full border-0 shadow-lg text-base"
+                >
+                  <Icon className="ml-2 h-5 w-5" /> {btnState.text}
                 </Button>
               </Link>
             )}
