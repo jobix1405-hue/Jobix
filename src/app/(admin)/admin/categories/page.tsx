@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { 
   Layers, Plus, Trash2, Loader2, AlertCircle, 
-  CheckCircle2, Search, GitMerge, FolderTree
+  CheckCircle2, Search, GitMerge, FolderTree, Edit2
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase";
 
 interface Category {
@@ -30,12 +31,18 @@ export default function AdminCategoriesPage() {
   const [activeTab, setActiveTab] = useState<"pending" | "all">("pending");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 🔥 استیت‌های جدید و هوشمند برای فرم
-  const [creationLevel, setCreationLevel] = useState<1 | 2 | 3>(1); // ۱=اصلی، ۲=زیرمجموعه، ۳=شغل
-  const [selectedLevel1Id, setSelectedLevel1Id] = useState(""); // پدر برای لول ۲
-  const [selectedLevel2Id, setSelectedLevel2Id] = useState(""); // پدر برای لول ۳
+  // استیت‌های فرم ایجاد
+  const [creationLevel, setCreationLevel] = useState<1 | 2>(1);
+  const [selectedLevel1Id, setSelectedLevel1Id] = useState(""); 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+
+  // 🔥 استیت‌های مودال ویرایش
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editParentId, setEditParentId] = useState("");
 
   const fetchCategories = async () => {
     setIsLoading(true);
@@ -62,46 +69,30 @@ export default function AdminCategoriesPage() {
     fetchCategories();
   }, []);
 
-  // توابع برای پر کردن لیست‌های کشویی آبشاری
   const level1Options = categories
     .filter(c => c.level === 1)
     .sort((a, b) => a.title.localeCompare(b.title))
     .map(c => ({ value: c.id, label: c.title }));
 
-  const level2Options = categories
-    .filter(c => c.level === 2 && c.parent_id === selectedLevel1Id)
-    .sort((a, b) => a.title.localeCompare(b.title))
-    .map(c => ({ value: c.id, label: c.title }));
-
-  // پیدا کردن مسیر برای نمایش در جدول
   const getParentPath = (cat: Category) => {
-    if (cat.level === 1) return "دسته اصلی";
+    if (cat.level === 1) return "گروه اصلی";
     if (cat.level === 2) {
       const parent = categories.find(c => c.id === cat.parent_id);
       return parent ? parent.title : 'نامشخص';
     }
-    if (cat.level === 3) {
-      const parent = categories.find(c => c.id === cat.parent_id);
-      if (!parent) return 'نامشخص';
-      const grandParent = categories.find(c => c.id === parent.parent_id);
-      return `${grandParent ? grandParent.title : '?'} > ${parent.title}`;
-    }
     return "-";
   };
 
+  // هندلر ایجاد دسته‌بندی جدید
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // ولیدیشن‌های هوشمند
     if (!title || !slug) {
       return setError("لطفاً هم عنوان و هم نام انگلیسی را وارد کنید.");
     }
     if (creationLevel === 2 && !selectedLevel1Id) {
-      return setError("برای ساخت زیرمجموعه، باید دسته اصلی آن را انتخاب کنید.");
-    }
-    if (creationLevel === 3 && (!selectedLevel1Id || !selectedLevel2Id)) {
-      return setError("برای ساخت عنوان شغلی، باید دسته اصلی و زیرمجموعه آن را انتخاب کنید.");
+      return setError("برای ساخت عنوان شغلی، باید گروه اصلی آن را انتخاب کنید.");
     }
     
     setIsSubmitting(true);
@@ -109,7 +100,6 @@ export default function AdminCategoriesPage() {
     try {
       let finalParentId = null;
       if (creationLevel === 2) finalParentId = selectedLevel1Id;
-      if (creationLevel === 3) finalParentId = selectedLevel2Id;
 
       const { error: insertError } = await supabase
         .from('job_categories')
@@ -126,13 +116,54 @@ export default function AdminCategoriesPage() {
         throw insertError;
       }
 
-      // پاک کردن فرم پس از موفقیت
       setTitle("");
       setSlug("");
       fetchCategories();
       
     } catch (err: any) {
       setError(err.message || "خطا در ثبت اطلاعات");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 🔥 هندلر باز کردن مودال ویرایش
+  const handleOpenEdit = (cat: Category) => {
+    setCategoryToEdit(cat);
+    setEditTitle(cat.title);
+    setEditSlug(cat.slug);
+    setEditParentId(cat.parent_id || "");
+    setIsEditModalOpen(true);
+  };
+
+  // 🔥 هندلر ذخیره تغییرات ویرایش
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryToEdit) return;
+
+    if (!editTitle || !editSlug) {
+      alert("لطفاً فیلدهای اجباری را پر کنید.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error: updateError } = await supabase
+        .from('job_categories')
+        .update({
+          title: editTitle,
+          slug: editSlug.toLowerCase(),
+          parent_id: categoryToEdit.level === 2 ? editParentId : null
+        })
+        .eq('id', categoryToEdit.id);
+
+      if (updateError) throw updateError;
+
+      setIsEditModalOpen(false);
+      fetchCategories(); // رفرش لیست
+    } catch (err: any) {
+      console.error("Error updating:", err);
+      alert("خطا در ذخیره تغییرات. ممکن است نام انگلیسی (Slug) تکراری باشد.");
     } finally {
       setIsSubmitting(false);
     }
@@ -149,14 +180,14 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این مورد مطمئن هستید؟ در صورت حذف، تمام زیرمجموعه‌های آن نیز یتیم خواهند شد.")) return;
+    if (!confirm("آیا از حذف این مورد مطمئن هستید؟ در صورت وجود آگهی فعال با این عنوان، سیستم اجازه حذف نخواهد داد.")) return;
     
     try {
       const { error } = await supabase.from('job_categories').delete().eq('id', id);
       if (error) throw error;
       setCategories(categories.filter(c => c.id !== id));
     } catch (err) {
-      alert("خطا! ممکن است زیرمجموعه یا آگهی فعالی برای این دسته‌بندی وجود داشته باشد.");
+      alert("خطا! به دلیل اتصال آگهی‌های فعال به این دسته‌بندی، امکان حذف وجود ندارد. به جای حذف، آن را ویرایش کنید.");
     }
   };
 
@@ -179,13 +210,13 @@ export default function AdminCategoriesPage() {
           مدیریت دسته‌بندی‌های شغلی
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          ایجاد ساختار درختی مشاغل (دسته اصلی {'>'} زیرمجموعه {'>'} عنوان شغلی)
+          ایجاد و ویرایش ساختار درختی مشاغل (گروه اصلی {'>'} عنوان شغلی)
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* 🔥 ستون راست: فرم هوشمند جدید */}
+        {/* ستون راست: فرم ثبت جدید */}
         <div className="lg:col-span-1">
           <form onSubmit={handleAddCategory} className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm sticky top-24">
             <h2 className="text-lg font-bold text-slate-900 mb-4 border-b border-slate-100 pb-4 flex items-center gap-2">
@@ -201,20 +232,18 @@ export default function AdminCategoriesPage() {
             )}
 
             <div className="space-y-5">
-              {/* انتخابگر نوع ساخت */}
               <div>
                 <label className="text-sm font-bold text-slate-700 mb-2 block">چه چیزی می‌خواهید بسازید؟</label>
                 <div className="flex bg-slate-100 p-1 rounded-xl">
                   {[
-                    { level: 1, label: "دسته اصلی" },
-                    { level: 2, label: "زیرمجموعه" },
-                    { level: 3, label: "شغل" }
+                    { level: 1, label: "گروه اصلی" },
+                    { level: 2, label: "عنوان شغلی" }
                   ].map((item) => (
                     <button
                       key={item.level}
                       type="button"
                       onClick={() => {
-                        setCreationLevel(item.level as 1|2|3);
+                        setCreationLevel(item.level as 1|2);
                         setError(null);
                       }}
                       className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
@@ -229,41 +258,27 @@ export default function AdminCategoriesPage() {
                 </div>
               </div>
 
-              {/* فیلدهای پویا بر اساس انتخاب ادمین */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
                 
-                {(creationLevel === 2 || creationLevel === 3) && (
+                {creationLevel === 2 && (
                   <Select 
-                    label="دسته اصلی را انتخاب کنید *"
+                    label="گروه اصلی را انتخاب کنید *"
                     options={level1Options}
                     value={selectedLevel1Id}
-                    onChange={(e) => {
-                      setSelectedLevel1Id(e.target.value);
-                      setSelectedLevel2Id(""); // ریست کردن فرزند
-                    }}
-                  />
-                )}
-
-                {creationLevel === 3 && (
-                  <Select 
-                    label="زیرمجموعه را انتخاب کنید *"
-                    options={level2Options}
-                    value={selectedLevel2Id}
-                    onChange={(e) => setSelectedLevel2Id(e.target.value)}
-                    disabled={!selectedLevel1Id}
+                    onChange={(e) => setSelectedLevel1Id(e.target.value)}
                   />
                 )}
 
                 <Input 
-                  label={`عنوان ${creationLevel === 1 ? 'دسته اصلی' : creationLevel === 2 ? 'زیرمجموعه' : 'شغلی'} (فارسی) *`}
-                  placeholder={creationLevel === 1 ? "مثال: فناوری اطلاعات" : creationLevel === 2 ? "مثال: برنامه‌نویسی" : "مثال: توسعه‌دهنده فرانت‌اند"}
+                  label={`عنوان ${creationLevel === 1 ? 'گروه اصلی' : 'شغلی'} (فارسی) *`}
+                  placeholder={creationLevel === 1 ? "مثال: فناوری اطلاعات" : "مثال: برنامه‌نویسی"}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
                 
                 <Input 
                   label="نام انگلیسی (Slug) *" 
-                  placeholder={creationLevel === 1 ? "مثال: it" : creationLevel === 2 ? "مثال: programming" : "مثال: frontend-developer"}
+                  placeholder={creationLevel === 1 ? "مثال: it" : "مثال: programming"}
                   dir="ltr"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))}
@@ -278,7 +293,7 @@ export default function AdminCategoriesPage() {
           </form>
         </div>
 
-        {/* ستون چپ: لیست دیتاها (بدون تغییر) */}
+        {/* ستون چپ: لیست دیتاها */}
         <div className="lg:col-span-2 space-y-6">
           
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
@@ -334,7 +349,7 @@ export default function AdminCategoriesPage() {
                     <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-900 flex items-center gap-2">
-                          <span className={`h-2.5 w-2.5 rounded-full ${cat.level === 1 ? 'bg-primary' : cat.level === 2 ? 'bg-secondary' : 'bg-green-500'}`}></span>
+                          <span className={`h-2.5 w-2.5 rounded-full ${cat.level === 1 ? 'bg-primary' : 'bg-green-500'}`}></span>
                           {cat.title}
                         </div>
                         <div className="text-xs text-slate-400 mt-1 font-mono" dir="ltr">{cat.slug}</div>
@@ -361,6 +376,16 @@ export default function AdminCategoriesPage() {
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
                           )}
+                          
+                          {/* 🔥 دکمه ویرایش */}
+                          <button 
+                            onClick={() => handleOpenEdit(cat)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors"
+                            title="ویرایش دسته‌بندی"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+
                           <button 
                             onClick={() => handleDelete(cat.id)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-colors"
@@ -392,6 +417,58 @@ export default function AdminCategoriesPage() {
 
         </div>
       </div>
+
+      {/* 🔥 مودال ویرایش دسته‌بندی */}
+      <Modal 
+        isOpen={isEditModalOpen} 
+        onClose={() => !isSubmitting && setIsEditModalOpen(false)}
+        title="ویرایش دسته‌بندی"
+      >
+        <form onSubmit={handleSaveEdit} className="space-y-4 pt-2">
+          
+          {categoryToEdit?.level === 2 && (
+            <Select 
+              label="جابجایی به یک گروه اصلی دیگر"
+              options={level1Options}
+              value={editParentId}
+              onChange={(e) => setEditParentId(e.target.value)}
+            />
+          )}
+
+          <Input 
+            label="عنوان (فارسی) *"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+          />
+          
+          <Input 
+            label="نام انگلیسی (Slug) *"
+            dir="ltr"
+            value={editSlug}
+            onChange={(e) => setEditSlug(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))}
+          />
+
+          <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="flex-1"
+              onClick={() => setIsEditModalOpen(false)}
+              disabled={isSubmitting}
+            >
+              انصراف
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1"
+              isLoading={isSubmitting}
+            >
+              ذخیره تغییرات
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
     </div>
   );
 }

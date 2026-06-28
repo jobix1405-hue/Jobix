@@ -14,7 +14,8 @@ import {
   FileText,
   AlertTriangle,
   Loader2,
-  Sparkles
+  Sparkles,
+  Search // 👈 اضافه شدن آیکون سرچ
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
@@ -143,7 +144,7 @@ export default function EmployerDashboard() {
     <div className="mx-auto max-w-6xl animate-in fade-in duration-500 space-y-8">
       
       {/* هدر داشبورد */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
             سلام، {companyName}
@@ -153,15 +154,25 @@ export default function EmployerDashboard() {
             به پنل مدیریت آگهی‌ها و استخدام خوش آمدید.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+        
+        {/* دکمه‌های هدر (ویرایش شده برای اضافه شدن جستجوی کارجو) */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+          <div className="hidden lg:block text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
             {new Date().toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
-          <Link href="/employer/post-job">
-            <Button className="rounded-xl h-10 px-4 shadow-sm">
-              <Plus className="ml-1 h-4 w-4" /> ثبت آگهی جدید
-            </Button>
-          </Link>
+          
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Link href="/employer/search-seekers" className="flex-1 sm:flex-none">
+              <Button variant="outline" className="w-full rounded-xl h-10 px-4 bg-white border-slate-200 text-slate-700 hover:text-primary hover:border-primary shadow-sm">
+                <Search className="ml-1 h-4 w-4" /> جستجوی کارجو
+              </Button>
+            </Link>
+            <Link href="/employer/post-job" className="flex-1 sm:flex-none">
+              <Button className="w-full rounded-xl h-10 px-4 shadow-sm">
+                <Plus className="ml-1 h-4 w-4" /> ثبت آگهی جدید
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 

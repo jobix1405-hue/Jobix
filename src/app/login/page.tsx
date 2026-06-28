@@ -4,7 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Key, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase";
@@ -19,9 +19,11 @@ function LoginForm() {
   const supabase = createClient();
   const { setUser } = useStore();
 
+  const [loginMethod, setLoginMethod] = useState<"otp" | "password">("otp");
   const [step, setStep] = useState<1 | 2>(1);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -32,7 +34,118 @@ function LoginForm() {
     }
   }, [isBannedError, supabase, setUser]);
 
-  // ۱. درخواست کد تایید
+  // تابع مشترک برای پردازش بعد از لاگین موفق (جلوگیری از تکرار کد)
+  const processLoginSuccess = async (userId: string, userPhone: string) => {
+    // ۱. واکشی پروفایل که به لطف تریگر جدید در دیتابیس قطعا ساخته شده است
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_banned')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // ۲. برنامه‌نویسی تدافعی: اگر به ندرت تریگر دیتابیس با تاخیر مواجه شد، خودمان می‌سازیمش
+    if (!profile) {
+      const { error: insertError } = await supabase.from('profiles').insert({
+        id: userId,
+        phone_number: userPhone,
+        is_banned: false
+      });
+      
+      if (insertError) {
+        console.error("Fallback Insert Error:", insertError.message);
+      }
+      
+      profile = { role: null, is_banned: false };
+    }
+
+    // ۳. بررسی وضعیت مسدودی کاربر
+    if (profile?.is_banned) {
+      await supabase.auth.signOut();
+      setUser(null);
+      setStep(1);
+      setOtp("");
+      setPassword("");
+      router.replace('/login?error=banned');
+      return;
+    }
+
+    // ۴. بروزرسانی استیت سراسری سیستم
+    setUser({
+      id: userId,
+      phone: userPhone,
+      role: profile?.role || null
+    });
+
+    router.refresh();
+
+    // ۵. مسیردهی هوشمند بر اساس نقش (Role)
+    if (profile?.role) {
+      let redirectUrl = '/job-seeker';
+      if (profile.role === 'admin') redirectUrl = '/admin';
+      else if (profile.role === 'employer') redirectUrl = '/employer';
+
+      router.push(nextUrl || redirectUrl);
+    } else {
+      // اگر کاربر نقشی نداشت (ثبت‌نام جدید)
+      let intendedRole: "employer" | "job_seeker" | null = null;
+      
+      if (nextUrl?.includes('employer')) intendedRole = 'employer';
+      else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
+
+      if (intendedRole) {
+        // استفاده از upsert برای محکم‌کاری
+        await supabase.from('profiles').upsert({ 
+          id: userId,
+          phone_number: userPhone,
+          role: intendedRole
+        });
+        
+        setUser({
+          id: userId,
+          phone: userPhone,
+          role: intendedRole
+        });
+        router.push(nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker'));
+      } else {
+        router.push('/onboarding');
+      }
+    }
+  };
+
+  // ۱. لاگین با رمز عبور ثابت
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!phoneNumber.startsWith("09") || phoneNumber.length !== 11) {
+      return setErrorMessage("شماره موبایل باید ۱۱ رقمی باشد و با 09 شروع شود.");
+    }
+    if (!password) {
+      return setErrorMessage("لطفاً رمز عبور خود را وارد کنید.");
+    }
+    
+    setIsLoading(true);
+    const formattedPhone = "+98" + phoneNumber.substring(1);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        phone: formattedPhone,
+        password: password,
+      });
+
+      if (error) {
+        setErrorMessage("شماره موبایل یا رمز عبور اشتباه است.");
+      } else if (data.user) {
+        await processLoginSuccess(data.user.id, data.user.phone || formattedPhone);
+      }
+    } catch (err) {
+      setErrorMessage("خطای ارتباط با سرور.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ۲. درخواست کد تایید OTP
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -63,7 +176,7 @@ function LoginForm() {
     }
   };
 
-  // ۲. تایید کد و هندلینگ پیشرفته پروفایل
+  // ۳. تایید کد OTP
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -87,81 +200,7 @@ function LoginForm() {
         console.error("OTP Verify Error:", error.message);
         setErrorMessage("کد وارد شده اشتباه است یا منقضی شده.");
       } else if (data.user) {
-        
-        // ۱. واکشی پروفایل که به لطف تریگر جدید در دیتابیس قطعا ساخته شده است
-        let { data: profile } = await supabase
-          .from('profiles')
-          .select('role, is_banned')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        // ۲. برنامه‌نویسی تدافعی: اگر به ندرت تریگر دیتابیس با تاخیر مواجه شد، خودمان می‌سازیمش
-        if (!profile) {
-          const { error: insertError } = await supabase.from('profiles').insert({
-            id: data.user.id,
-            phone_number: data.user.phone || formattedPhone,
-            is_banned: false
-          });
-          
-          if (insertError) {
-            console.error("Fallback Insert Error:", insertError.message);
-          }
-          
-          profile = { role: null, is_banned: false };
-        }
-
-        // ۳. بررسی وضعیت مسدودی کاربر
-        if (profile?.is_banned) {
-          await supabase.auth.signOut();
-          setUser(null);
-          setStep(1);
-          setOtp("");
-          router.replace('/login?error=banned');
-          return;
-        }
-
-        // ۴. بروزرسانی استیت سراسری سیستم
-        setUser({
-          id: data.user.id,
-          phone: data.user.phone || formattedPhone,
-          role: profile?.role || null
-        });
-
-        router.refresh();
-
-        // ۵. مسیردهی هوشمند بر اساس نقش (Role)
-        if (profile?.role) {
-          let redirectUrl = '/job-seeker';
-          if (profile.role === 'admin') redirectUrl = '/admin';
-          else if (profile.role === 'employer') redirectUrl = '/employer';
-
-          router.push(nextUrl || redirectUrl);
-        } else {
-          // اگر کاربر نقشی نداشت (ثبت‌نام جدید)
-          let intendedRole: "employer" | "job_seeker" | null = null;
-          
-          if (nextUrl?.includes('employer')) intendedRole = 'employer';
-          else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
-
-          if (intendedRole) {
-            // استفاده از upsert برای محکم‌کاری (اگر پروفایل بود آپدیت میکنه، اگر نبود میسازه)
-            await supabase.from('profiles').upsert({ 
-              id: data.user.id,
-              phone_number: data.user.phone || formattedPhone,
-              role: intendedRole
-            });
-            
-            setUser({
-              id: data.user.id,
-              phone: data.user.phone || formattedPhone,
-              role: intendedRole
-            });
-            router.push(nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker'));
-          } else {
-            // اگر از صفحه عادی اومده، بره صفحه آنبوردینگ برای انتخاب نقش
-            router.push('/onboarding');
-          }
-        }
+        await processLoginSuccess(data.user.id, data.user.phone || formattedPhone);
       }
     } catch (err) {
       console.error(err);
@@ -211,7 +250,26 @@ function LoginForm() {
             </div>
           )}
 
+          {/* تب انتخاب روش ورود */}
           {step === 1 && (
+            <div className="mb-6 flex bg-slate-100 p-1 rounded-xl">
+              <button
+                onClick={() => { setLoginMethod("otp"); setErrorMessage(null); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === "otp" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+              >
+                <MessageSquare className="h-4 w-4" /> با پیامک
+              </button>
+              <button
+                onClick={() => { setLoginMethod("password"); setErrorMessage(null); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === "password" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+              >
+                <Key className="h-4 w-4" /> با رمز عبور
+              </button>
+            </div>
+          )}
+
+          {/* فرم ورود با پیامک */}
+          {step === 1 && loginMethod === "otp" && (
             <form onSubmit={handleSendCode} className="space-y-6 animate-in fade-in duration-500">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-slate-900">ورود / ثبت‌نام</h2>
@@ -277,6 +335,52 @@ function LoginForm() {
             </form>
           )}
 
+          {/* فرم ورود با رمز عبور */}
+          {step === 1 && loginMethod === "password" && (
+            <form onSubmit={handlePasswordLogin} className="space-y-6 animate-in fade-in duration-500">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900">ورود با رمز عبور</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  موبایل و رمز عبور خود را وارد کنید
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <Input
+                  type="tel"
+                  dir="ltr"
+                  placeholder="09123456789"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="text-center text-xl tracking-[0.2em] h-12 font-bold text-slate-700"
+                  maxLength={11}
+                  disabled={isLoading}
+                  autoFocus
+                />
+                
+                <Input
+                  type="password"
+                  dir="ltr"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="text-center text-xl tracking-[0.3em] h-12 font-bold text-slate-700"
+                  disabled={isLoading}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 text-lg rounded-xl shadow-lg shadow-primary/20 transition-all"
+                isLoading={isLoading}
+                disabled={phoneNumber.length !== 11 || !password || isLoading}
+              >
+                ورود به حساب کاربری
+              </Button>
+            </form>
+          )}
+
+          {/* فرم تایید کد OTP (مرحله ۲) */}
           {step === 2 && (
             <form onSubmit={handleVerifyCode} className="space-y-6 animate-in slide-in-from-left-4 fade-in duration-500">
               <div className="text-center">

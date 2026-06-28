@@ -2,14 +2,16 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { phone, name, jobTitle } = await req.json();
+    const { phone, name, jobTitle, customMessage } = await req.json();
 
     if (!phone) {
       return NextResponse.json({ error: 'شماره موبایل الزامی است' }, { status: 400 });
     }
 
     const apiKey = process.env.SMS_API_KEY;
-    const message = `کارجوی گرامی ${name}، شما برای موقعیت شغلی "${jobTitle}" به مصاحبه دعوت شدید. لطفاً پنل جابیکس خود را بررسی کنید.`;
+    
+    // اگر متن سفارشی داده شده بود آن را بفرست، در غیر این صورت متن دیفالت
+    const message = customMessage || `کارجوی گرامی ${name}، شما برای موقعیت شغلی "${jobTitle}" به مصاحبه دعوت شدید. لطفاً پنل جابیکس خود را بررسی کنید.`;
 
     // اگر کلید واقعی پیامک رو هنوز تو فایل env نذاشته بودیم، برنامه کرش نمیکنه و فقط تو کنسول چاپ میکنه
     if (!apiKey || apiKey === 'test_api_key_for_now') {

@@ -12,7 +12,10 @@ import {
   Eye,
   Loader2,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  Search,
+  ChevronLeft,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
@@ -39,7 +42,7 @@ type ApplicationStatus = "pending" | "reviewed" | "interview" | "rejected";
 interface ApplicationData {
   id: string;
   applicantName: string;
-  applicantPhone: string; // اضافه شدن فیلد شماره موبایل برای ارسال پیامک
+  applicantPhone: string;
   jobTitle: string;
   date: string;
   matchScore: number;
@@ -55,8 +58,10 @@ const COLUMNS = [
   { id: "rejected", title: "رد شده", icon: XCircle, color: "border-red-200 bg-red-50 text-red-700" },
 ];
 
+const PAGE_SIZE = 50; // تعداد رزومه‌هایی که در هر مرحله لود می‌شوند
+
 // ==========================================
-// 1. کامپوننت کارت رزومه (استفاده مجدد)
+// 1. کامپوننت کارت رزومه
 // ==========================================
 const ApplicationCard = ({ 
   app, 
@@ -78,8 +83,8 @@ const ApplicationCard = ({
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
         <User className="h-5 w-5" />
       </div>
-      <div>
-        <h4 className="font-bold text-slate-900">{app.applicantName}</h4>
+      <div className="pl-6">
+        <h4 className="font-bold text-slate-900 line-clamp-1">{app.applicantName}</h4>
         <p className="text-xs font-medium text-slate-500 mt-0.5 line-clamp-1">{app.jobTitle}</p>
       </div>
     </div>
@@ -119,7 +124,7 @@ const ApplicationCard = ({
 );
 
 // ==========================================
-// 2. کامپوننت قابل درگ شدن (Draggable)
+// 2. کامپوننت قابل درگ شدن
 // ==========================================
 function DraggableItem({ app, handleStartChat, isStartingChat }: any) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -140,7 +145,7 @@ function DraggableItem({ app, handleStartChat, isStartingChat }: any) {
 }
 
 // ==========================================
-// 3. کامپوننت ستون هدف (Droppable)
+// 3. کامپوننت ستون هدف
 // ==========================================
 function DroppableColumn({ column, apps, children }: any) {
   const { setNodeRef, isOver } = useDroppable({
@@ -190,77 +195,112 @@ export default function EmployerApplicationsPage() {
   const [isStartingChat, setIsStartingChat] = useState<string | null>(null);
   const [activeDragApp, setActiveDragApp] = useState<ApplicationData | null>(null);
 
-  // تنظیمات سنسورها برای پشتیبانی کامل از تاچ موبایل و موس
+  // استیت‌های مربوط به جستجو و صفحه‌بندی
+  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // کاربر باید 5 پیکسل درگ کنه تا جابجایی شروع شه
+        distance: 5, 
       },
     })
   );
 
-  useEffect(() => {
-    const fetchApplications = async () => {
-      if (!user?.id) return;
+  const fetchApplications = async (pageIndex: number, isAppend: boolean = false) => {
+    if (!user?.id) return;
+    
+    if (isAppend) {
+      setIsLoadingMore(true);
+    } else {
       setIsLoading(true);
-      try {
-        const { data, error: fetchError } = await supabase
-          .from('applications')
-          .select(`
-            id, status, created_at, job_seeker_id,
-            jobs!inner (id, title, description, employer_id),
-            profiles!applications_job_seeker_id_fkey (first_name, last_name, phone_number, job_title, skills)
-          `)
-          .eq('jobs.employer_id', user.id)
-          .order('created_at', { ascending: false });
+    }
 
-        if (fetchError) throw fetchError;
+    try {
+      const from = pageIndex * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-        if (data) {
-          const formattedData: ApplicationData[] = data.map((app: any) => {
-            const realMatchScore = calculateMatchScore(
-              { job_title: app.profiles?.job_title, skills: app.profiles?.skills },
-              { title: app.jobs?.title, description: app.jobs?.description }
-            );
+      const { data, count, error: fetchError } = await supabase
+        .from('applications')
+        .select(`
+          id, status, created_at, job_seeker_id,
+          jobs!inner (id, title, description, employer_id),
+          profiles!applications_job_seeker_id_fkey (first_name, last_name, phone_number, job_title, skills)
+        `, { count: 'exact' })
+        .eq('jobs.employer_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
-            return {
-              id: app.id,
-              applicantName: app.profiles?.first_name ? `${app.profiles.first_name} ${app.profiles.last_name}` : "کاربر بدون نام",
-              applicantPhone: app.profiles?.phone_number || "", // گرفتن شماره برای اس ام اس
-              jobTitle: app.jobs?.title || "نامشخص",
-              date: new Date(app.created_at).toLocaleDateString('fa-IR'),
-              matchScore: realMatchScore,
-              status: app.status as ApplicationStatus,
-              jobSeekerId: app.job_seeker_id,
-              jobId: app.jobs?.id
-            };
-          });
+      if (fetchError) throw fetchError;
+
+      if (data) {
+        const formattedData: ApplicationData[] = data.map((app: any) => {
+          const realMatchScore = calculateMatchScore(
+            { job_title: app.profiles?.job_title, skills: app.profiles?.skills },
+            { title: app.jobs?.title, description: app.jobs?.description }
+          );
+
+          return {
+            id: app.id,
+            applicantName: app.profiles?.first_name ? `${app.profiles.first_name} ${app.profiles.last_name}` : "کاربر بدون نام",
+            applicantPhone: app.profiles?.phone_number || "", 
+            jobTitle: app.jobs?.title || "نامشخص",
+            date: new Date(app.created_at).toLocaleDateString('fa-IR'),
+            matchScore: realMatchScore,
+            status: app.status as ApplicationStatus,
+            jobSeekerId: app.job_seeker_id,
+            jobId: app.jobs?.id
+          };
+        });
+
+        if (isAppend) {
+          setApplications(prev => [...prev, ...formattedData]);
+        } else {
           setApplications(formattedData);
         }
-      } catch (err: any) {
-        console.error("خطا در دریافت رزومه‌ها:", err);
-        setError("خطایی در دریافت رزومه‌ها رخ داد. لطفاً صفحه را رفرش کنید.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
-    fetchApplications();
+        // بررسی اینکه آیا رکوردهای بیشتری در دیتابیس وجود دارد یا خیر
+        if (count !== null && (pageIndex + 1) * PAGE_SIZE >= count) {
+          setHasMore(false);
+        } else if (data.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+      }
+    } catch (err: any) {
+      console.error("خطا در دریافت رزومه‌ها:", err);
+      setError("خطایی در دریافت رزومه‌ها رخ داد. لطفاً صفحه را رفرش کنید.");
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  // واکشی اولیه در زمان لود کامپوننت
+  useEffect(() => {
+    fetchApplications(0, false);
   }, [user?.id, supabase]);
 
-  // رویداد شروع جابجایی
+  // هندلر دکمه بارگذاری بیشتر
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchApplications(nextPage, true);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const draggedApp = applications.find((app) => app.id === active.id);
     if (draggedApp) setActiveDragApp(draggedApp);
   };
 
-  // رویداد پایان جابجایی (رها کردن کارت)
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragApp(null);
 
-    // اگر کارتی بیرون از ستون‌ها رها شد هیچ کاری نکن
     if (!over) return;
 
     const appId = active.id as string;
@@ -271,12 +311,10 @@ export default function EmployerApplicationsPage() {
 
     const previousStatus = targetApp.status;
 
-    // 1. آپدیت آنی UI (Optimistic Update)
     setApplications((prev) =>
       prev.map((app) => (app.id === appId ? { ...app, status: newStatus } : app))
     );
 
-    // 2. آپدیت دیتابیس و ارسال پیامک
     try {
       const { error: updateError } = await supabase
         .from('applications')
@@ -285,19 +323,22 @@ export default function EmployerApplicationsPage() {
 
       if (updateError) throw updateError;
 
-      // =========================================================
-      // اجرای اتوماتیک ارسال پیامک دعوت به مصاحبه در پس‌زمینه
-      // =========================================================
-      if (newStatus === 'interview' && previousStatus !== 'interview') {
-        if (targetApp.applicantPhone) {
-          // نیازی به await نداریم چون نمیخوایم کارفرما منتظر بمونه
+      // ارسال پیامک
+      if (targetApp.applicantPhone) {
+        let statusFa = "";
+        if (newStatus === "reviewed") statusFa = "دیده شده";
+        else if (newStatus === "interview") statusFa = "دعوت به مصاحبه";
+        else if (newStatus === "rejected") statusFa = "رد شده";
+
+        if (statusFa) {
+          const smsMessage = `کارجوی گرامی ${targetApp.applicantName}، وضعیت رزومه شما برای شغل "${targetApp.jobTitle}" به "${statusFa}" تغییر یافت. جابیکس`;
+          
           fetch('/api/sms', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               phone: targetApp.applicantPhone,
-              name: targetApp.applicantName,
-              jobTitle: targetApp.jobTitle
+              customMessage: smsMessage
             })
           }).catch(err => console.error("Error triggering SMS API:", err));
         }
@@ -305,7 +346,6 @@ export default function EmployerApplicationsPage() {
 
     } catch (err) {
       console.error("خطا در آپدیت وضعیت:", err);
-      // برگرداندن به حالت قبل در صورت خطا
       setApplications((prev) =>
         prev.map((app) => (app.id === appId ? { ...app, status: previousStatus } : app))
       );
@@ -320,7 +360,7 @@ export default function EmployerApplicationsPage() {
     try {
       const { data: existingConv, error: checkError } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, is_deleted_by_employer')
         .eq('employer_id', user.id)
         .eq('job_seeker_id', app.jobSeekerId)
         .eq('job_id', app.jobId)
@@ -329,6 +369,16 @@ export default function EmployerApplicationsPage() {
       if (checkError) throw checkError;
 
       if (existingConv) {
+        if (existingConv.is_deleted_by_employer) {
+          await supabase
+            .from('conversations')
+            .update({ 
+              is_deleted_by_employer: false, 
+              status: 'pending_seeker', 
+              requested_by: 'employer' 
+            })
+            .eq('id', existingConv.id);
+        }
         router.push('/employer/messages');
         return;
       }
@@ -338,7 +388,9 @@ export default function EmployerApplicationsPage() {
         .insert({
           employer_id: user.id,
           job_seeker_id: app.jobSeekerId,
-          job_id: app.jobId
+          job_id: app.jobId,
+          status: 'pending_seeker',
+          requested_by: 'employer'
         });
 
       if (insertError) throw insertError;
@@ -352,6 +404,11 @@ export default function EmployerApplicationsPage() {
     }
   };
 
+  const filteredApplications = applications.filter(app => 
+    app.applicantName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    app.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (isLoading) {
     return (
       <div className="flex h-[70vh] flex-col items-center justify-center gap-4">
@@ -362,13 +419,33 @@ export default function EmployerApplicationsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col animate-in fade-in duration-500">
+    <div className="flex h-full flex-col animate-in fade-in duration-500 pb-10">
       
-      <div className="mb-8 border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-bold text-slate-900">مدیریت رزومه‌ها (ATS)</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          برای تغییر وضعیت، کارت رزومه‌ها را بکشید و در ستون مورد نظر رها کنید. (هنگام انتقال به بخش "دعوت به مصاحبه" پیامک خودکار ارسال خواهد شد)
-        </p>
+      <button 
+        onClick={() => router.back()} 
+        className="mb-4 flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-primary transition-colors bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm w-fit"
+      >
+        <ChevronLeft className="h-4 w-4" /> بازگشت
+      </button>
+
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">مدیریت رزومه‌ها (ATS)</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            برای تغییر وضعیت، کارت‌ها را کشیده و رها کنید (پیامک به صورت خودکار ارسال می‌شود).
+          </p>
+        </div>
+        
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="جستجوی نام کارجو یا عنوان آگهی..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full h-10 pl-3 pr-9 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" 
+          />
+        </div>
       </div>
 
       {error && (
@@ -387,7 +464,7 @@ export default function EmployerApplicationsPage() {
       >
         <div className="flex flex-1 flex-col gap-6 overflow-x-auto pb-4 lg:flex-row">
           {COLUMNS.map((column) => {
-            const columnApps = applications.filter((app) => app.status === column.id);
+            const columnApps = filteredApplications.filter((app) => app.status === column.id);
 
             return (
               <DroppableColumn key={column.id} column={column} apps={columnApps}>
@@ -411,6 +488,27 @@ export default function EmployerApplicationsPage() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* دکمه بارگذاری بیشتر رزومه‌ها */}
+      {hasMore && !searchTerm && (
+        <div className="mt-8 flex justify-center">
+          <Button 
+            variant="outline" 
+            onClick={handleLoadMore} 
+            isLoading={isLoadingMore}
+            className="rounded-xl border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 bg-white shadow-sm"
+          >
+            {!isLoadingMore && <ChevronDown className="ml-2 h-4 w-4" />}
+            بارگذاری رزومه‌های قدیمی‌تر
+          </Button>
+        </div>
+      )}
+
+      {searchTerm && hasMore && (
+        <p className="text-center text-xs text-slate-400 mt-6">
+          * جستجو در میان رزومه‌های لود شده انجام می‌شود. برای جستجوی رزومه‌های قدیمی‌تر، ابتدا فیلتر را پاک کرده و رزومه‌های بیشتری بارگذاری کنید.
+        </p>
+      )}
     </div>
   );
 }

@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { 
   Search, Users, User, Building2, 
-  ShieldAlert, ShieldCheck, Loader2, CalendarClock 
+  ShieldAlert, ShieldCheck, Loader2, CalendarClock, AlertCircle 
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal"; // 👈 ایمپورت مودال اضافه شد
 import { createClient } from "@/lib/supabase";
 
 interface UserProfile {
@@ -15,7 +17,7 @@ interface UserProfile {
   company_name: string | null;
   phone_number: string | null;
   created_at: string;
-  is_banned: boolean; // اضافه شدن فیلد مسدودی
+  is_banned: boolean; 
 }
 
 export default function AdminUsersPage() {
@@ -25,7 +27,18 @@ export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "job_seeker" | "employer">("all");
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  
+  // 👈 استیت‌های جدید برای مدیریت مودال مسدودسازی
+  const [banModalState, setBanModalState] = useState<{
+    isOpen: boolean;
+    userId: string | null;
+    isCurrentlyBanned: boolean;
+  }>({
+    isOpen: false,
+    userId: null,
+    isCurrentlyBanned: false
+  });
+  const [isProcessingBan, setIsProcessingBan] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -58,28 +71,36 @@ export default function AdminUsersPage() {
     return "کاربر (تکمیل نشده)";
   };
 
-  // تابع تغییر وضعیت مسدودی در دیتابیس
-  const toggleBanStatus = async (id: string, currentBanStatus: boolean) => {
-    if (processingId) return;
-    const confirmMessage = currentBanStatus ? "آیا از رفع مسدودی این کاربر مطمئن هستید؟" : "آیا از مسدود کردن این کاربر اطمینان دارید؟ کاربر فوراً از سیستم اخراج خواهد شد.";
-    if (!confirm(confirmMessage)) return;
+  // 👈 باز کردن مودال به جای confirm()
+  const confirmToggleBanStatus = (id: string, currentBanStatus: boolean) => {
+    setBanModalState({
+      isOpen: true,
+      userId: id,
+      isCurrentlyBanned: currentBanStatus
+    });
+  };
 
-    setProcessingId(id);
+  // 👈 عملیات اصلی تغییر وضعیت داخل این تابع انجام میشه
+  const executeToggleBan = async () => {
+    const { userId, isCurrentlyBanned } = banModalState;
+    if (!userId) return;
+
+    setIsProcessingBan(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ is_banned: !currentBanStatus })
-        .eq('id', id);
+        .update({ is_banned: !isCurrentlyBanned })
+        .eq('id', userId);
 
       if (error) throw error;
 
-      // آپدیت UI به صورت آنی
-      setUsers(users.map(u => u.id === id ? { ...u, is_banned: !currentBanStatus } : u));
+      setUsers(users.map(u => u.id === userId ? { ...u, is_banned: !isCurrentlyBanned } : u));
+      setBanModalState({ isOpen: false, userId: null, isCurrentlyBanned: false });
     } catch (err) {
       console.error("Error toggling ban status:", err);
       alert("خطا در ارتباط با سرور. تغییرات انجام نشد.");
     } finally {
-      setProcessingId(null);
+      setIsProcessingBan(false);
     }
   };
 
@@ -207,17 +228,14 @@ export default function AdminUsersPage() {
                     <td className="px-6 py-4 text-left">
                       {user.role !== 'admin' && (
                         <button 
-                          disabled={processingId === user.id}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
                             user.is_banned 
                               ? 'border-green-200 text-green-600 hover:bg-green-50' 
                               : 'border-red-200 text-red-600 hover:bg-red-50'
-                          } ${processingId === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          onClick={() => toggleBanStatus(user.id, user.is_banned)}
+                          }`}
+                          onClick={() => confirmToggleBanStatus(user.id, user.is_banned)}
                         >
-                          {processingId === user.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : user.is_banned ? (
+                          {user.is_banned ? (
                             <ShieldCheck className="h-4 w-4" />
                           ) : (
                             <ShieldAlert className="h-4 w-4" />
@@ -239,6 +257,55 @@ export default function AdminUsersPage() {
           </table>
         </div>
       </div>
+
+      {/* 👈 مودال جایگزین دیالوگ مرورگر */}
+      <Modal 
+        isOpen={banModalState.isOpen} 
+        onClose={() => !isProcessingBan && setBanModalState({ ...banModalState, isOpen: false })}
+        title={banModalState.isCurrentlyBanned ? "رفع مسدودی کاربر" : "مسدودسازی حساب کاربر"}
+      >
+        <div className="flex flex-col items-center text-center pb-4 pt-2">
+          <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-full ${banModalState.isCurrentlyBanned ? 'bg-green-100' : 'bg-red-100'}`}>
+            {banModalState.isCurrentlyBanned ? (
+              <ShieldCheck className="h-7 w-7 text-green-600" />
+            ) : (
+              <AlertCircle className="h-7 w-7 text-red-600" />
+            )}
+          </div>
+          
+          <h3 className="text-lg font-bold text-slate-900 mb-2">
+            {banModalState.isCurrentlyBanned 
+              ? "آیا از رفع مسدودی این کاربر مطمئن هستید؟" 
+              : "آیا از مسدود کردن این کاربر اطمینان دارید؟"
+            }
+          </h3>
+          
+          <p className="text-sm text-slate-500 leading-relaxed">
+            {banModalState.isCurrentlyBanned 
+              ? "با تایید این مورد، کاربر مجدداً می‌تواند وارد حساب خود شده و فعالیت کند." 
+              : "با این کار، کاربر فوراً از سیستم اخراج شده و دیگر اجازه ورود به حساب کاربری خود را نخواهد داشت."
+            }
+          </p>
+
+          <div className="mt-8 flex w-full gap-3">
+            <Button 
+              variant="outline" 
+              className="flex-1 h-12" 
+              onClick={() => setBanModalState({ ...banModalState, isOpen: false })} 
+              disabled={isProcessingBan}
+            >
+              انصراف
+            </Button>
+            <Button 
+              className={`flex-1 h-12 border-none ${banModalState.isCurrentlyBanned ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`} 
+              onClick={executeToggleBan} 
+              isLoading={isProcessingBan}
+            >
+              {banModalState.isCurrentlyBanned ? "بله، رفع مسدودی شود" : "بله، کاربر مسدود شود"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
     </div>
   );
