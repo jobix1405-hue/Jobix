@@ -9,8 +9,8 @@ export function Footer() {
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           
           {/* بخش معرفی و لوگو */}
-          <div className="space-y-6 xl:col-span-1">
-            <div className="flex items-center gap-3 mb-6">
+          <div className="flex flex-col gap-4 xl:col-span-1">
+            <div className="flex items-center gap-3">
               <Link href="/">
                 <Image
                   src="/logo-full.webp"
@@ -29,19 +29,31 @@ export function Footer() {
               </Link>
             </div>
 
-            <p className="text-sm leading-relaxed text-slate-500 max-w-xs">
-              <strong className="text-slate-700 font-bold text-base">بازار هوشمند استخدام ایران</strong>
+            <p className="text-sm leading-relaxed text-slate-500 max-w-xs -mt-1">
+              <strong className="text-slate-800 font-bold text-base">بازار هوشمند استخدام ایران</strong>
               <br />
-              <span className="font-medium mt-1 inline-block">مرجع رسانه‌ای منابع انسانی</span>
+              <span className="font-medium mt-1 inline-block text-slate-500">مرجع رسانه‌ای منابع انسانی</span>
             </p>
             
             {/* راه‌های ارتباطی و رسانه‌ها */}
-            <div className="flex items-center gap-4 pt-2">
-              <a href="https://t.me/jobixxhr" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300">
-                <Image src="/icons/telegram.png" alt="Telegram" width={26} height={26} />
+            <div className="flex flex-wrap items-center gap-3 pt-3">
+              <a 
+                href="https://t.me/jobixxhr" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="group flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:shadow-blue-500/10"
+              >
+                <Image src="/icons/telegram.png" alt="کانال تلگرام جابیکس" width={22} height={22} className="transition-transform duration-300 group-hover:scale-110" />
+                <span className="text-xs font-bold text-blue-700">کانال تلگرام</span>
               </a>
-              <a href="https://ble.ir/jobixx" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300">
-                <Image src="/icons/bale.png" alt="Bale" width={26} height={26} className="rounded-full" />
+              <a 
+                href="https://ble.ir/jobixx" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="group flex items-center gap-2 rounded-xl bg-green-50 border border-green-100 px-3 py-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:shadow-green-500/10"
+              >
+                <Image src="/icons/bale.png" alt="کانال بله جابیکس" width={22} height={22} className="rounded-full transition-transform duration-300 group-hover:scale-110" />
+                <span className="text-xs font-bold text-green-700">ارتباط در بله</span>
               </a>
             </div>
           </div>
