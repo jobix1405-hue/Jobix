@@ -19,9 +19,24 @@ interface SeekerProfile {
   address: string;
   avatar_url: string;
   about_me: string;
+  work_status: string; // 👈 فیلد وضعیت اشتغال اضافه شد
 }
 
-const PAGE_SIZE = 30; // تعداد کارجویانی که در هر بار لود نمایش داده می‌شوند
+const PAGE_SIZE = 30;
+
+// 👈 تابع کمکی برای نمایش زیبای وضعیت اشتغال
+const getWorkStatusBadge = (status: string) => {
+  switch (status) {
+    case 'ready': 
+      return <span className="inline-flex items-center gap-1 bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-md text-[10px] font-bold">🟢 آماده به کار</span>;
+    case 'negotiating': 
+      return <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-md text-[10px] font-bold">🟡 در حال مذاکره</span>;
+    case 'hired': 
+      return <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-md text-[10px] font-bold">🔴 مشغول به کار</span>;
+    default: 
+      return null;
+  }
+};
 
 export default function SearchSeekersPage() {
   const router = useRouter();
@@ -30,17 +45,14 @@ export default function SearchSeekersPage() {
   const [seekers, setSeekers] = useState<SeekerProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // استیت‌های فیلتر جستجو
   const [titleTerm, setTitleTerm] = useState("");
   const [skillTerm, setSkillTerm] = useState("");
   const [locationTerm, setLocationTerm] = useState("");
 
-  // 👈 استیت‌های جدید برای صفحه‌بندی
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // تابع اصلی واکشی اطلاعات با پشتیبانی از صفحات
   const fetchSeekers = async (pageIndex: number, isAppend: boolean = false) => {
     if (isAppend) {
       setIsLoadingMore(true);
@@ -49,24 +61,21 @@ export default function SearchSeekersPage() {
     }
 
     try {
-      // محاسبه رنج برای Supabase
       const from = pageIndex * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      // دریافت اطلاعات همراه با تعداد کل
+      // 👈 فیلد work_status به کوئری اضافه شد
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, job_title, skills, address, avatar_url, about_me', { count: 'exact' })
+        .select('id, first_name, last_name, job_title, skills, address, avatar_url, about_me, work_status', { count: 'exact' })
         .eq('role', 'job_seeker')
         .eq('is_banned', false)
         .not('job_title', 'is', null);
 
-      // اعمال فیلترها
       if (titleTerm) query = query.ilike('job_title', `%${titleTerm}%`);
       if (skillTerm) query = query.ilike('skills', `%${skillTerm}%`);
       if (locationTerm) query = query.ilike('address', `%${locationTerm}%`);
 
-      // مرتب‌سازی و اعمال رنج
       query = query.order('created_at', { ascending: false }).range(from, to);
 
       const { data, count, error } = await query;
@@ -80,7 +89,6 @@ export default function SearchSeekersPage() {
         setSeekers(formattedData);
       }
 
-      // 👈 بررسی اینکه آیا صفحه بعدی وجود دارد یا خیر
       if (count !== null && (pageIndex + 1) * PAGE_SIZE >= count) {
         setHasMore(false);
       } else if (formattedData.length < PAGE_SIZE) {
@@ -97,14 +105,13 @@ export default function SearchSeekersPage() {
     }
   };
 
-  // واکشی اولیه
   useEffect(() => {
     fetchSeekers(0, false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(0); // ریست کردن صفحه هنگام سرچ جدید
+    setPage(0);
     fetchSeekers(0, false);
   };
 
@@ -116,7 +123,6 @@ export default function SearchSeekersPage() {
     setTimeout(() => fetchSeekers(0, false), 100);
   };
 
-  // هندلر دکمه لود بیشتر
   const handleLoadMore = () => {
     const nextPage = page + 1;
     setPage(nextPage);
@@ -128,7 +134,6 @@ export default function SearchSeekersPage() {
   return (
     <div className="flex h-full flex-col animate-in fade-in duration-500 pb-10">
       
-      {/* دکمه بازگشت */}
       <button 
         onClick={() => router.back()} 
         className="mb-4 flex w-fit items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-500 shadow-sm transition-colors hover:text-primary"
@@ -148,7 +153,6 @@ export default function SearchSeekersPage() {
         </div>
       </div>
 
-      {/* فرم فیلترها */}
       <form onSubmit={handleSearch} className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
@@ -204,7 +208,6 @@ export default function SearchSeekersPage() {
         </div>
       </form>
 
-      {/* نتایج جستجو */}
       {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center text-slate-500">
           <Loader2 className="mb-4 h-10 w-10 animate-spin text-primary" />
@@ -227,16 +230,23 @@ export default function SearchSeekersPage() {
                         <User className="h-8 w-8" />
                       )}
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 group-hover:text-primary transition-colors">
-                        {seeker.first_name ? `${seeker.first_name} ${seeker.last_name}` : "کارجو (بدون نام)"}
-                      </h3>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <h3 className="font-bold text-slate-900 group-hover:text-primary transition-colors line-clamp-1">
+                          {seeker.first_name ? `${seeker.first_name} ${seeker.last_name}` : "کارجو (بدون نام)"}
+                        </h3>
+                      </div>
                       <p className="mt-1 text-sm font-medium text-slate-500 line-clamp-1">
                         {seeker.job_title}
                       </p>
-                      <span className="mt-2 flex items-center gap-1 text-xs text-slate-400">
-                        <MapPin className="h-3 w-3" /> {seeker.address || "مکان نامشخص"}
-                      </span>
+                      
+                      {/* 👈 نمایش وضعیت اشتغال در کارت جستجو */}
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        {getWorkStatusBadge(seeker.work_status)}
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400">
+                          <MapPin className="h-3 w-3" /> {seeker.address || "مکان نامشخص"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -246,7 +256,6 @@ export default function SearchSeekersPage() {
                     </p>
                   )}
 
-                  {/* تگ‌های مهارت */}
                   {seeker.skills && (
                     <div className="mt-4 flex flex-wrap gap-1.5">
                       {seeker.skills.split(',').slice(0, 4).map((skill, idx) => (
@@ -274,7 +283,6 @@ export default function SearchSeekersPage() {
             ))}
           </div>
 
-          {/* 👈 دکمه بارگذاری بیشتر */}
           {hasMore && (
             <div className="mt-10 flex justify-center">
               <Button 

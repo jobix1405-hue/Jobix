@@ -19,7 +19,7 @@ import {
   Package,
   AlertTriangle,
   GraduationCap,
-  Megaphone // 👈 این آیکون اضافه شد
+  Megaphone 
 } from "lucide-react";
 
 interface SidebarItem {
@@ -59,7 +59,8 @@ export function Sidebar({ role }: SidebarProps) {
       { name: "مدیریت تعرفه‌ها", href: "/admin/packages", icon: Package },
       { name: "گزارشات مالی", href: "/admin/transactions", icon: CreditCard },
       { name: "گزارشات تخلف", href: "/admin/reports", icon: AlertTriangle },
-      { name: "اطلاع‌رسانی سراسری", href: "/admin/announcements", icon: Megaphone }, // 👈 این لینک اضافه شد
+      { name: "درخواست‌های آکادمی", href: "/admin/course-requests", icon: GraduationCap }, // 👈 این لینک با موفقیت اضافه شد
+      { name: "اطلاع‌رسانی سراسری", href: "/admin/announcements", icon: Megaphone },
     ];
   } else if (role === "employer") {
     links = [

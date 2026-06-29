@@ -15,7 +15,6 @@ import { Select } from "@/components/ui/Select";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
-// توابع کمکی برای تبدیل نام‌های انگلیسی دیتابیس به فارسی
 const getJobTypeLabel = (type: string) => {
   const types: Record<string, string> = { 
     "full-time": "تمام وقت", 
@@ -46,27 +45,22 @@ export default function SingleJobPage() {
   const [jobDetails, setJobDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // استیت‌های مودال اپلای
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [applySuccess, setApplySuccess] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
-  // استیت چت
   const [isChatRequesting, setIsChatRequesting] = useState(false);
 
-  // استیت‌های بوکمارک (نشان‌کردن)
   const [isSaved, setIsSaved] = useState(false);
   const [isSavingLoading, setIsSavingLoading] = useState(false);
 
-  // استیت‌های مودال گزارش تخلف
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDesc, setReportDesc] = useState("");
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
 
-  // واکشی اطلاعات آگهی و وضعیت ذخیره بودن
   useEffect(() => {
     const fetchJobData = async () => {
       try {
@@ -79,7 +73,6 @@ export default function SingleJobPage() {
         if (jobError) throw jobError;
         setJobDetails(jobData);
 
-        // افزایش بازدید به صورت امن از طریق RPC
         if (jobData) {
           try {
             await supabase.rpc('increment_job_view', { p_job_id: jobData.id });
@@ -143,33 +136,46 @@ export default function SingleJobPage() {
     }
   };
 
-  // هندلر جدید: درخواست چت مستقیم با کارفرما
+  // 🔥 باگ منطقی سیستم چت در این قسمت کاملاً برطرف شد
   const handleRequestChat = async () => {
     if (!user) return router.push(`/login?next=/jobs/${params.id}`);
     if (user.role === 'employer') return alert("کارفرمایان نمی‌توانند درخواست چت ارسال کنند.");
 
     setIsChatRequesting(true);
     try {
-      // بررسی اینکه قبلا چتی با این کارفرما برای این آگهی باز شده یا نه
+      // 👈 واکشی فیلد is_deleted_by_employer برای تشخیص مسدودی چت
       const { data: existingConv } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, is_deleted_by_employer') 
         .eq('employer_id', jobDetails.employer_id)
         .eq('job_seeker_id', user.id)
         .eq('job_id', jobDetails.id)
         .maybeSingle();
 
       if (existingConv) {
+        // اگر کارفرما قبلاً چت را پاک (رد) کرده بود، دوباره آن را فعال (Revive) می‌کنیم
+        if (existingConv.is_deleted_by_employer) {
+          const { error } = await supabase.from('conversations')
+            .update({ 
+              is_deleted_by_employer: false, 
+              status: 'pending_employer', 
+              requested_by: 'job_seeker',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingConv.id);
+            
+          if (error) throw error;
+          alert('درخواست چت شما مجدداً برای کارفرما ارسال شد.');
+        }
         router.push('/job-seeker/messages');
         return;
       }
 
-      // ایجاد درخواست جدید
       const { error } = await supabase.from('conversations').insert({
         employer_id: jobDetails.employer_id,
         job_seeker_id: user.id,
         job_id: jobDetails.id,
-        status: 'pending_employer', // در انتظار تایید کارفرما
+        status: 'pending_employer',
         requested_by: 'job_seeker'
       });
 
@@ -237,8 +243,8 @@ export default function SingleJobPage() {
       setTimeout(() => {
         setIsReportModalOpen(false);
         setReportSuccess(false);
-        setReportReason(""); // رفع باگ: ریست کردن فرم
-        setReportDesc("");   // رفع باگ: ریست کردن فرم
+        setReportReason(""); 
+        setReportDesc("");   
       }, 3000);
     } catch (err) { 
       console.error("Error reporting:", err);
@@ -269,10 +275,8 @@ export default function SingleJobPage() {
 
         <div className="flex flex-col gap-8 lg:flex-row">
           
-          {/* ستون اصلی (راست) - محتوای آگهی */}
           <div className="flex-1 space-y-6">
             
-            {/* هدر آگهی */}
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
               <div className="h-32 bg-gradient-to-r from-primary/10 to-transparent"></div>
               <div className="px-6 pb-8 pt-0 sm:px-10">
@@ -296,7 +300,6 @@ export default function SingleJobPage() {
                     </div>
                   </div>
                   
-                  {/* بخش دکمه‌ها (تفکیک چت و رزومه) */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button onClick={handleShare} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:bg-slate-50 hover:text-primary" title="اشتراک گذاری">
@@ -334,7 +337,6 @@ export default function SingleJobPage() {
               </div>
             </div>
 
-            {/* توضیحات واقعی خوانده شده از دیتابیس */}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-10 shadow-sm">
               <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" /> شرح شغل و مهارت‌های مورد نیاز
@@ -355,7 +357,6 @@ export default function SingleJobPage() {
               )}
             </div>
 
-            {/* باکس زیبای پاداش معرفی (Headhunt) */}
             {jobDetails.referral_reward > 0 && (
               <div className="rounded-3xl bg-gradient-to-r from-amber-50 to-white p-6 sm:p-8 border border-amber-200 shadow-sm relative overflow-hidden">
                 <div className="absolute -left-10 -top-10 text-amber-100/50">
@@ -377,7 +378,6 @@ export default function SingleJobPage() {
 
           </div>
 
-          {/* ستون کناری (چپ) - اطلاعات شرکت */}
           <aside className="w-full lg:w-1/3 space-y-6">
             <div className="sticky top-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4 mb-4">
@@ -406,7 +406,6 @@ export default function SingleJobPage() {
                 </div>
               )}
 
-              {/* برگرداندن باکس آبی راهنما که هوش مصنوعی قبلی پاک کرده بود */}
               <div className="mt-8 rounded-xl bg-blue-50 p-4 border border-blue-100">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
@@ -440,7 +439,6 @@ export default function SingleJobPage() {
           </div>
         ) : (
           <form onSubmit={handleApply} className="space-y-5">
-            {/* برگرداندن کارت خلاصه آگهی که هوش مصنوعی پاک کرده بود */}
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 flex gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm overflow-hidden border border-slate-200">
                 {logo ? <img src={logo} alt="logo" className="w-full h-full object-cover"/> : <Building2 className="h-5 w-5 text-slate-400" />}
@@ -478,7 +476,6 @@ export default function SingleJobPage() {
           </div>
         ) : (
           <form onSubmit={handleReport} className="space-y-4 pt-2">
-            {/* برگرداندن باکس هشدار نارنجی که هوش مصنوعی پاک کرده بود */}
             <div className="rounded-lg bg-orange-50 border border-orange-100 p-3 text-xs text-orange-800 mb-4">
               در صورت مشاهده درخواست وجه، کلاهبرداری، اطلاعات دروغین یا رفتار نامناسب، مراتب را گزارش دهید.
             </div>

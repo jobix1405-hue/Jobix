@@ -28,6 +28,7 @@ interface ApplicantProfile {
   phone_number: string;
   email: string;
   avatar_url: string;
+  work_status: string; // 👈 فیلد جدید
 }
 
 const SEEKER_BADGES = [
@@ -36,6 +37,20 @@ const SEEKER_BADGES = [
   { id: "professional", label: "متخصص و حرفه‌ای" },
   { id: "team_player", label: "روحیه کار تیمی" },
 ];
+
+// 👈 تابع نمایش وضعیت اشتغال
+const getWorkStatusBadge = (status: string) => {
+  switch (status) {
+    case 'ready': 
+      return <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-lg text-xs font-bold">🟢 آماده به کار</span>;
+    case 'negotiating': 
+      return <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-lg text-xs font-bold">🟡 در حال مذاکره</span>;
+    case 'hired': 
+      return <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-lg text-xs font-bold">🔴 مشغول به کار</span>;
+    default: 
+      return null;
+  }
+};
 
 export default function ApplicantProfilePage() {
   const params = useParams();
@@ -48,7 +63,6 @@ export default function ApplicantProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
-  // استیت‌های مودال ارزیابی
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [score, setScore] = useState<number>(0);
   const [selectedBadge, setSelectedBadge] = useState<string>("");
@@ -58,7 +72,6 @@ export default function ApplicantProfilePage() {
   useEffect(() => {
     const fetchProfileAndRatings = async () => {
       try {
-        // واکشی پروفایل
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -68,7 +81,6 @@ export default function ApplicantProfilePage() {
         if (profileError) throw profileError;
         setProfile(profileData);
 
-        // واکشی ارزیابی‌ها
         const { data: ratingsData } = await supabase
           .from('ratings')
           .select('score, badge, review_text')
@@ -160,7 +172,6 @@ export default function ApplicantProfilePage() {
   const fullName = profile.first_name ? `${profile.first_name} ${profile.last_name}` : 'کارجو (بدون نام)';
   const avgScore = ratings.length > 0 ? (ratings.reduce((a, b) => a + b.score, 0) / ratings.length).toFixed(1) : 'جدید';
   
-  // محاسبه تعداد هر بج
   const badgeCounts = ratings.reduce((acc: Record<string, number>, curr) => {
     acc[curr.badge] = (acc[curr.badge] || 0) + 1;
     return acc;
@@ -182,7 +193,11 @@ export default function ApplicantProfilePage() {
                   {profile.avatar_url ? <img src={profile.avatar_url} alt="avatar" className="h-full w-full object-cover" /> : <User className="h-10 w-10" />}
                 </div>
                 <div className="mb-2">
-                  <h1 className="text-2xl font-extrabold text-slate-900">{fullName}</h1>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h1 className="text-2xl font-extrabold text-slate-900">{fullName}</h1>
+                    {/* 👈 نمایش وضعیت اشتغال در پروفایل */}
+                    {getWorkStatusBadge(profile.work_status)}
+                  </div>
                   <p className="mt-1 text-lg font-medium text-slate-600">{profile.job_title || 'بدون عنوان شغلی'}</p>
                 </div>
               </div>
@@ -197,7 +212,6 @@ export default function ApplicantProfilePage() {
               </div>
             </div>
 
-            {/* بخش نمایش امتیازها و مدال‌ها */}
             {(ratings.length > 0) && (
               <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-6">
                 <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-xl">
@@ -212,7 +226,6 @@ export default function ApplicantProfilePage() {
                     return (
                       <span key={badgeId} className="flex items-center gap-1.5 text-xs font-bold bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl border border-blue-100">
                         <Award className="h-4 w-4" /> {badgeLabel} 
-                        {/* 🔥 حل ارور تایپ اسکریپت با تبدیل به عدد */}
                         <span className="bg-blue-200/50 px-1.5 rounded-md text-[10px]">{Number(count)}</span>
                       </span>
                     );
@@ -293,7 +306,6 @@ export default function ApplicantProfilePage() {
 
       <Modal isOpen={isRatingModalOpen} onClose={() => !isSubmittingRating && setIsRatingModalOpen(false)} title="ارزیابی کارجو">
         <form onSubmit={handleSubmitRating} className="space-y-6 pt-2">
-          {/* بخش امتیازدهی ستاره‌ای */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-3 text-center">امتیاز شما به این شخص</label>
             <div className="flex justify-center gap-2 flex-row-reverse">
@@ -310,7 +322,6 @@ export default function ApplicantProfilePage() {
             </div>
           </div>
 
-          {/* بخش انتخاب نشان (Badge) */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-3">یک نشان ویژه انتخاب کنید</label>
             <div className="grid grid-cols-2 gap-3">
