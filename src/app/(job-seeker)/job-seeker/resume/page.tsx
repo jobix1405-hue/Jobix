@@ -37,8 +37,9 @@ const resumeSchema = z.object({
   aboutMe: z.string().max(1000, "توضیحات نمی‌تواند بیشتر از ۱۰۰۰ حرف باشد").optional(),
   skills: z.string().optional(),
   workStatus: z.enum(['ready', 'negotiating', 'hired']),
-  experiences: z.array(experienceSchema).default([]),
-  educations: z.array(educationSchema).default([]),
+  // 🔥 حل ارور تایپ‌اسکریپت (حذف default)
+  experiences: z.array(experienceSchema),
+  educations: z.array(educationSchema),
 });
 
 type ResumeFormValues = z.infer<typeof resumeSchema>;
