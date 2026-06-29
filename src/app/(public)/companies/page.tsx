@@ -91,6 +91,7 @@ export default function CompaniesDirectoryPage() {
               >
                 <div>
                   <div className="flex items-start gap-4 mb-4">
+                    {/* لوگو شرکت */}
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-2xl font-bold text-primary overflow-hidden shadow-sm">
                       {company.logo_url ? (
                         <img src={company.logo_url} alt={company.company_name} className="h-full w-full object-cover" />
@@ -98,14 +99,18 @@ export default function CompaniesDirectoryPage() {
                         company.company_name.charAt(0)
                       )}
                     </div>
+
                     <div>
+                      {/* 🔥 FIX: اسم شرکت قبل از آیکون تایید قرار گرفت */}
                       <h2 className="text-lg font-bold text-slate-900 group-hover:text-primary transition-colors flex items-center gap-1.5">
+                        {company.company_name}
                         {company.is_verified && (
-  <span title="تایید شده" className="flex items-center">
-    <ShieldCheck className="h-5 w-5 text-blue-500" />
-  </span>
-)}
+                          <span title="تایید شده" className="flex items-center shrink-0">
+                            <ShieldCheck className="h-5 w-5 text-blue-500" />
+                          </span>
+                        )}
                       </h2>
+
                       <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
                         <MapPin className="h-4 w-4 text-slate-400" />
                         <span className="line-clamp-1">{company.address || 'آدرس نامشخص'}</span>

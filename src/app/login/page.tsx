@@ -4,7 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Key, MessageSquare } from "lucide-react";
+import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Key, MessageSquare, Info } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase";
@@ -26,6 +26,8 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 🔥 استیت جدید: پیام راهنمای آبی رنگ (برای فراموشی رمز)
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // در صورت مسدود بودن، کاربر را خارج می‌کنیم
   useEffect(() => {
@@ -112,6 +114,16 @@ function LoginForm() {
     }
   };
 
+  // 🔥 هندلر فراموشی رمز عبور: سوئیچ به تب OTP با پیام راهنما
+  const handleForgotPassword = () => {
+    setLoginMethod("otp");
+    setErrorMessage(null);
+    setPassword("");
+    setInfoMessage(
+      "برای بازیابی رمز عبور، با شماره موبایل خود وارد شوید. سپس از بخش «تنظیمات» رمز عبور جدید تعیین کنید."
+    );
+  };
+
   // ۱. لاگین با رمز عبور ثابت
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +179,7 @@ function LoginForm() {
         console.error("OTP Send Error:", error.message);
         setErrorMessage("خطا در ارسال پیامک. لطفاً شماره را بررسی کنید.");
       } else {
+        setInfoMessage(null); // پیام راهنما بعد از ارسال کد پاک می‌شود
         setStep(2); 
       }
     } catch (err) {
@@ -222,6 +235,7 @@ function LoginForm() {
 
         <div className="p-8 sm:p-10 relative">
           
+          {/* لوگو */}
           <div className="mb-8 flex justify-center">
             <Link href="/" className="transition-transform hover:scale-105">
               <Image
@@ -235,6 +249,7 @@ function LoginForm() {
             </Link>
           </div>
 
+          {/* پیام مسدودی */}
           {isBannedError && (
             <div className="mb-6 flex flex-col items-center justify-center gap-2 rounded-2xl bg-red-50 p-4 text-center border border-red-100 animate-in fade-in zoom-in duration-500">
               <ShieldAlert className="h-8 w-8 text-red-500 mb-1" />
@@ -243,6 +258,15 @@ function LoginForm() {
             </div>
           )}
 
+          {/* 🔥 پیام راهنمای آبی (فراموشی رمز) */}
+          {infoMessage && (
+            <div className="mb-6 flex items-start gap-2 rounded-xl bg-blue-50 p-3 text-sm text-blue-700 border border-blue-100 animate-in fade-in slide-in-from-top-2">
+              <Info className="h-5 w-5 shrink-0 mt-0.5 text-blue-500" />
+              <p className="leading-relaxed">{infoMessage}</p>
+            </div>
+          )}
+
+          {/* پیام خطا */}
           {errorMessage && (
             <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-600 border border-red-100 animate-in fade-in slide-in-from-top-2">
               <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
@@ -254,13 +278,13 @@ function LoginForm() {
           {step === 1 && (
             <div className="mb-6 flex bg-slate-100 p-1 rounded-xl">
               <button
-                onClick={() => { setLoginMethod("otp"); setErrorMessage(null); }}
+                onClick={() => { setLoginMethod("otp"); setErrorMessage(null); setInfoMessage(null); }}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === "otp" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
               >
                 <MessageSquare className="h-4 w-4" /> با پیامک
               </button>
               <button
-                onClick={() => { setLoginMethod("password"); setErrorMessage(null); }}
+                onClick={() => { setLoginMethod("password"); setErrorMessage(null); setInfoMessage(null); }}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === "password" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
               >
                 <Key className="h-4 w-4" /> با رمز عبور
@@ -367,6 +391,17 @@ function LoginForm() {
                   className="text-center text-xl tracking-[0.3em] h-12 font-bold text-slate-700"
                   disabled={isLoading}
                 />
+
+                {/* 🔥 لینک فراموشی رمز عبور */}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    رمز عبور خود را فراموش کرده‌اید؟
+                  </button>
+                </div>
               </div>
 
               <Button
