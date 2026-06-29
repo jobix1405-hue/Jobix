@@ -17,7 +17,8 @@ import {
   CreditCard,
   Layers,
   Package,
-  AlertTriangle // 👈 آیکون اضافه شده برای گزارشات تخلف
+  AlertTriangle,
+  GraduationCap
 } from "lucide-react";
 
 interface SidebarItem {
@@ -70,6 +71,7 @@ export function Sidebar({ role }: SidebarProps) {
     links = [
       { name: "پیشخوان", href: "/job-seeker", icon: LayoutDashboard },
       { name: "رزومه من", href: "/job-seeker/resume", icon: Briefcase },
+      { name: "آکادمی و مسیر شغلی", href: "/job-seeker/academy", icon: GraduationCap }, // 👈 این خط اضافه شد
       { name: "آگهی‌های نشان‌شده", href: "/job-seeker/saved-jobs", icon: Bookmark },
       { name: "درخواست‌های من", href: "/job-seeker/applications", icon: Users },
       { name: "پیام‌ها", href: "/job-seeker/messages", icon: MessageSquare },

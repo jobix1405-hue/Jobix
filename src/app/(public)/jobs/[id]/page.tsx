@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { 
   Building2, MapPin, Briefcase, Clock, DollarSign, 
-  ChevronRight, Share2, Bookmark, CheckCircle2, AlertCircle, Loader2, Flag, Zap, Gift
+  ChevronRight, Share2, Bookmark, CheckCircle2, AlertCircle, Loader2, Flag, Zap, Gift, MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -22,7 +22,7 @@ const getJobTypeLabel = (type: string) => {
     "part-time": "پاره وقت", 
     "remote": "دورکاری", 
     "internship": "کارآموزی",
-    "daily": "روزمزد (کارگر/پروژه‌ای)" // اضافه شدن نوع روزمزد
+    "daily": "روزمزد (کارگر/پروژه‌ای)" 
   };
   return types[type] || type;
 };
@@ -51,6 +51,9 @@ export default function SingleJobPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [applySuccess, setApplySuccess] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+
+  // استیت چت
+  const [isChatRequesting, setIsChatRequesting] = useState(false);
 
   // استیت‌های بوکمارک (نشان‌کردن)
   const [isSaved, setIsSaved] = useState(false);
@@ -140,6 +143,49 @@ export default function SingleJobPage() {
     }
   };
 
+  // هندلر جدید: درخواست چت مستقیم با کارفرما
+  const handleRequestChat = async () => {
+    if (!user) return router.push(`/login?next=/jobs/${params.id}`);
+    if (user.role === 'employer') return alert("کارفرمایان نمی‌توانند درخواست چت ارسال کنند.");
+
+    setIsChatRequesting(true);
+    try {
+      // بررسی اینکه قبلا چتی با این کارفرما برای این آگهی باز شده یا نه
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('employer_id', jobDetails.employer_id)
+        .eq('job_seeker_id', user.id)
+        .eq('job_id', jobDetails.id)
+        .maybeSingle();
+
+      if (existingConv) {
+        router.push('/job-seeker/messages');
+        return;
+      }
+
+      // ایجاد درخواست جدید
+      const { error } = await supabase.from('conversations').insert({
+        employer_id: jobDetails.employer_id,
+        job_seeker_id: user.id,
+        job_id: jobDetails.id,
+        status: 'pending_employer', // در انتظار تایید کارفرما
+        requested_by: 'job_seeker'
+      });
+
+      if (error) throw error;
+      
+      alert('درخواست چت شما ارسال شد. لطفاً منتظر تایید کارفرما باشید.');
+      router.push('/job-seeker/messages');
+
+    } catch (err) {
+      console.error("Error requesting chat:", err);
+      alert("خطا در ارسال درخواست چت.");
+    } finally {
+      setIsChatRequesting(false);
+    }
+  };
+
   const handleToggleSave = async () => {
     if (!user) return router.push(`/login?next=/jobs/${params.id}`);
     if (user.role === 'employer') return alert("کارفرمایان نیازی به ذخیره آگهی ندارند.");
@@ -191,10 +237,13 @@ export default function SingleJobPage() {
       setTimeout(() => {
         setIsReportModalOpen(false);
         setReportSuccess(false);
-        setReportReason("");
-        setReportDesc("");
+        setReportReason(""); // رفع باگ: ریست کردن فرم
+        setReportDesc("");   // رفع باگ: ریست کردن فرم
       }, 3000);
-    } catch (err) { alert("خطا در ثبت گزارش."); } finally { setIsReporting(false); }
+    } catch (err) { 
+      console.error("Error reporting:", err);
+      alert("خطا در ثبت گزارش."); 
+    } finally { setIsReporting(false); }
   };
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-[#f8fafc]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -235,7 +284,6 @@ export default function SingleJobPage() {
                     <div className="mb-2">
                       <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl flex flex-wrap items-center gap-3">
                         {jobDetails.title}
-                        {/* 🔥 نمایش بج نیاز فوری */}
                         {jobDetails.is_urgent && (
                           <span className="flex items-center gap-1 text-sm font-bold bg-orange-100 text-orange-600 px-3 py-1 rounded-lg border border-orange-200">
                             <Zap className="h-4 w-4" /> نیاز فوری
@@ -248,16 +296,24 @@ export default function SingleJobPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3">
-                    <button onClick={handleShare} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:bg-slate-50 hover:text-primary" title="اشتراک گذاری">
-                      <Share2 className="h-5 w-5" />
-                    </button>
-                    <button onClick={handleToggleSave} disabled={isSavingLoading} className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all ${isSaved ? "border-secondary bg-secondary/10 text-secondary" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-secondary"}`} title={isSaved ? "حذف از نشان‌شده‌ها" : "نشان کردن"}>
-                      {isSavingLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Bookmark className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />}
-                    </button>
-                    <Button size="lg" className="h-12 rounded-xl px-8" onClick={handleOpenApplyModal}>
-                      ارسال درخواست
-                    </Button>
+                  {/* بخش دکمه‌ها (تفکیک چت و رزومه) */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button onClick={handleShare} className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:bg-slate-50 hover:text-primary" title="اشتراک گذاری">
+                        <Share2 className="h-5 w-5" />
+                      </button>
+                      <button onClick={handleToggleSave} disabled={isSavingLoading} className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all ${isSaved ? "border-secondary bg-secondary/10 text-secondary" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-secondary"}`} title={isSaved ? "حذف از نشان‌شده‌ها" : "نشان کردن"}>
+                        {isSavingLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Bookmark className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />}
+                      </button>
+                    </div>
+                    <div className="flex w-full sm:w-auto gap-2">
+                      <Button variant="outline" className="flex-1 sm:flex-none h-12 rounded-xl border-primary text-primary hover:bg-primary/5 shadow-sm px-4" onClick={handleRequestChat} isLoading={isChatRequesting}>
+                        <MessageSquare className="h-5 w-5 ml-1.5" /> درخواست چت
+                      </Button>
+                      <Button size="lg" className="flex-1 sm:flex-none h-12 rounded-xl px-6 shadow-lg shadow-primary/20" onClick={handleOpenApplyModal}>
+                        ارسال رزومه
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -287,7 +343,6 @@ export default function SingleJobPage() {
                 {jobDetails.description}
               </p>
 
-              {/* 🔥 نمایش مزایا در صورت وجود */}
               {jobDetails.benefits && (
                 <>
                   <h3 className="text-xl font-bold text-slate-900 mt-10 mb-4 flex items-center gap-2">
@@ -300,7 +355,7 @@ export default function SingleJobPage() {
               )}
             </div>
 
-            {/* 🔥 باکس زیبای پاداش معرفی (Headhunt) */}
+            {/* باکس زیبای پاداش معرفی (Headhunt) */}
             {jobDetails.referral_reward > 0 && (
               <div className="rounded-3xl bg-gradient-to-r from-amber-50 to-white p-6 sm:p-8 border border-amber-200 shadow-sm relative overflow-hidden">
                 <div className="absolute -left-10 -top-10 text-amber-100/50">
@@ -351,6 +406,7 @@ export default function SingleJobPage() {
                 </div>
               )}
 
+              {/* برگرداندن باکس آبی راهنما که هوش مصنوعی قبلی پاک کرده بود */}
               <div className="mt-8 rounded-xl bg-blue-50 p-4 border border-blue-100">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
@@ -384,6 +440,7 @@ export default function SingleJobPage() {
           </div>
         ) : (
           <form onSubmit={handleApply} className="space-y-5">
+            {/* برگرداندن کارت خلاصه آگهی که هوش مصنوعی پاک کرده بود */}
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 flex gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm overflow-hidden border border-slate-200">
                 {logo ? <img src={logo} alt="logo" className="w-full h-full object-cover"/> : <Building2 className="h-5 w-5 text-slate-400" />}
@@ -421,6 +478,7 @@ export default function SingleJobPage() {
           </div>
         ) : (
           <form onSubmit={handleReport} className="space-y-4 pt-2">
+            {/* برگرداندن باکس هشدار نارنجی که هوش مصنوعی پاک کرده بود */}
             <div className="rounded-lg bg-orange-50 border border-orange-100 p-3 text-xs text-orange-800 mb-4">
               در صورت مشاهده درخواست وجه، کلاهبرداری، اطلاعات دروغین یا رفتار نامناسب، مراتب را گزارش دهید.
             </div>

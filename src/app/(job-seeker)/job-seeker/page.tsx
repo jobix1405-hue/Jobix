@@ -11,12 +11,14 @@ import {
   CheckCircle2, 
   AlertCircle,
   Building2,
-  Loader2
+  Loader2,
+  Map,       // 🔥 اضافه شده برای نقشه
+  Sparkles   // 🔥 اضافه شده برای پیشنهاد ویژه
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
-import { calculateMatchScore } from "@/lib/matching"; // 🔥 اضافه شدن الگوریتم هوشمند
+import { calculateMatchScore } from "@/lib/matching"; // الگوریتم هوشمند
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -79,7 +81,7 @@ export default function JobSeekerDashboard() {
           .select('*', { count: 'exact', head: true })
           .eq('job_seeker_id', user.id);
 
-        // 🔥 واکشی آگهی‌های فعال برای پیشنهاد هوشمند
+        // واکشی آگهی‌های فعال برای پیشنهاد هوشمند
         const { data: jobs } = await supabase
           .from('jobs')
           .select('id, title, description, profiles(company_name)')
@@ -146,8 +148,17 @@ export default function JobSeekerDashboard() {
             این خلاصه‌ای از فعالیت‌های شما در جابیکس است.
           </p>
         </div>
-        <div className="text-sm font-medium text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
-          {new Date().toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        
+        {/* 🔥 اضافه شدن دکمه نقشه زنده */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/jobs/map">
+            <Button variant="outline" className="w-full sm:w-auto rounded-xl h-11 bg-white border-slate-200 text-slate-700 hover:text-primary hover:border-primary shadow-sm">
+              <Map className="ml-2 h-4 w-4" /> نقشه زنده مشاغل
+            </Button>
+          </Link>
+          <div className="text-sm font-medium text-slate-500 bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center">
+            {new Date().toLocaleDateString('fa-IR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
         </div>
       </div>
 
@@ -185,7 +196,9 @@ export default function JobSeekerDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
+          {/* کارت وضعیت رزومه */}
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+            {/* برگرداندن افکت تار زیبا */}
             <div className="absolute -left-6 -top-6 h-24 w-24 rounded-full bg-primary/5 blur-2xl"></div>
             
             <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
@@ -205,6 +218,7 @@ export default function JobSeekerDashboard() {
               ></div>
             </div>
 
+            {/* برگرداندن متن راهنما */}
             <p className="text-xs text-slate-500 leading-relaxed mb-6">
               کارفرمایان به رزومه‌هایی که بالای ۸۰٪ تکمیل شده‌اند توجه بیشتری نشان می‌دهند.
             </p>
@@ -214,10 +228,15 @@ export default function JobSeekerDashboard() {
             </Link>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-            <h3 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-4">
-              پیشنهادات هوشمند برای شما
+          {/* 🔥 کارت پیشنهاد شغلی ویژه (با ظاهر جدید) */}
+          <div className="bg-white p-6 rounded-3xl border border-primary/20 shadow-md relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary"></div>
+            
+            <h3 className="font-bold text-slate-900 mb-4 pb-4 border-b border-slate-100 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-amber-500" />
+              پیشنهاد شغلی ویژه برای شما
             </h3>
+            
             <div className="space-y-4">
               {recommendedJobs.map((job) => (
                 <Link key={job.id} href={`/jobs/${job.id}`} className="group block">
@@ -243,6 +262,7 @@ export default function JobSeekerDashboard() {
                 <p className="text-xs text-slate-400 text-center py-4">آگهی جدیدی یافت نشد.</p>
               )}
             </div>
+            
             <Link href="/jobs">
               <Button variant="ghost" className="w-full mt-4 text-sm text-primary hover:bg-primary/5">
                 مشاهده همه فرصت‌ها
@@ -285,11 +305,13 @@ export default function JobSeekerDashboard() {
               {recentApps.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <Briefcase className="h-10 w-10 text-slate-300 mb-3" />
+                  {/* برگرداندن متن صحیح */}
                   <p className="text-sm text-slate-500">هنوز برای هیچ شغلی رزومه ارسال نکرده‌اید.</p>
                 </div>
               )}
             </div>
 
+            {/* 🔥 برگرداندن باکس دعوت به تکمیل رزومه که هوش مصنوعی قبلی به اشتباه پاک کرده بود */}
             {stats.profileCompletion < 100 && (
               <div className="mt-8 bg-gradient-to-r from-primary/10 to-transparent rounded-2xl p-5 border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
