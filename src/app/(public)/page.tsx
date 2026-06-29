@@ -5,6 +5,7 @@ import { SearchBox } from "@/components/shared/SearchBox";
 import { RoleCards } from "@/components/shared/RoleCards";
 import { TopCompanies } from "@/components/shared/TopCompanies";
 import { PopularCategories } from "@/components/shared/PopularCategories";
+import { CareerJourney } from "@/components/shared/CareerJourney"; // 👈 اضافه شدن کامپوننت مسیر شغلی
 import { 
   CheckCircle2, 
   TrendingUp, 
@@ -50,7 +51,7 @@ export default function HomePage() {
       </section>
 
       {/* =======================
-          2. نوار اعتماد (شرکت‌های برتر)
+          2. نوار اعتماد متحرک (شرکت‌های برتر)
       ======================= */}
       <TopCompanies />
 
@@ -60,7 +61,12 @@ export default function HomePage() {
       <PopularCategories />
 
       {/* =======================
-          4. بنر کارجو 
+          4. آکادمی و مسیر شغلی (Career Journey)
+      ======================= */}
+      <CareerJourney />
+
+      {/* =======================
+          5. بنر کارجو 
       ======================= */}
       <section className="w-full py-16 sm:py-24 bg-white overflow-hidden border-t border-slate-100">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -137,7 +143,7 @@ export default function HomePage() {
       </section>
 
       {/* =======================
-          5. بنر کارفرما 
+          6. بنر کارفرما 
       ======================= */}
       <section className="w-full py-16 sm:py-24 bg-slate-50 border-y border-slate-200 overflow-hidden">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -206,7 +212,7 @@ export default function HomePage() {
       </section>
 
       {/* =======================
-          6. آمار و ارقام
+          7. آمار و ارقام
       ======================= */}
       <section className="w-full bg-white py-16">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -237,7 +243,7 @@ export default function HomePage() {
       </section>
 
       {/* =======================
-          7. بخش نهایی (CTA)
+          8. بخش نهایی (CTA)
       ======================= */}
       <section className="w-full relative py-28 overflow-hidden">
         <Image
