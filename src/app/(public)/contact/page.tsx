@@ -43,7 +43,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">آدرس مراجعه حضوری:</h4>
-                  <p className="text-slate-600 mt-1 text-sm leading-relaxed">تهران، پارک فناوری پردیس، خیابان نوآوری، ساختمان جابیکس، طبقه سوم</p>
+                  <p className="text-slate-600 mt-1 text-sm leading-relaxed">تهران، پارک فناوری پردیس، ساختمان جابیکس</p>
                 </div>
               </li>
               
@@ -53,7 +53,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">شماره تماس (ساعات اداری):</h4>
-                  <p className="text-slate-600 mt-1 text-sm" dir="ltr">۰۲۱ - ۸۸۸۸ ۸۸۸۸</p>
+                  <p className="text-slate-600 mt-1 text-sm font-medium" dir="ltr">09010601610</p>
                 </div>
               </li>
 
@@ -63,7 +63,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">ایمیل پشتیبانی:</h4>
-                  <p className="text-slate-600 mt-1 text-sm font-medium" dir="ltr">support@jobixx.ir</p>
+                  <p className="text-slate-600 mt-1 text-sm font-medium" dir="ltr">jobix1405@gmail.com</p>
                 </div>
               </li>
 

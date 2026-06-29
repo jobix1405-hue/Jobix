@@ -1,8 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { MapPin, Phone, Mail, Code2, Library } from "lucide-react";
+import { MapPin, Phone, Mail, Code2, Library, CheckCircle2 } from "lucide-react";
 
-// ساخت آیکون‌های SVG اختصاصی برای شبکه‌های اجتماعی
 const InstagramIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
@@ -32,8 +31,8 @@ export function Footer() {
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           
           {/* بخش معرفی و لوگو */}
-          <div className="space-y-8 xl:col-span-1">
-            <div className="flex items-center gap-3">
+          <div className="space-y-6 xl:col-span-1">
+            <div className="flex items-center gap-3 mb-6">
               <Link href="/">
                 <Image
                   src="/logo-full.webp"
@@ -43,8 +42,6 @@ export function Footer() {
                   className="object-contain"
                 />
               </Link>
-
-              {/* === هک سئو: دکمه مخفی پارتنرها (نامرئی برای چشم، قابل دیدن برای گوگل) === */}
               <Link 
                 href="/partners" 
                 title="EcoSystem"
@@ -52,13 +49,22 @@ export function Footer() {
               >
                 <Library className="w-4 h-4" />
               </Link>
-              {/* ========================================================== */}
             </div>
 
-            <p className="text-sm leading-relaxed text-slate-500 max-w-xs">
-              جابیکس، هوشمندترین پلتفرم کاریابی و استخدام در ایران است که با استفاده از هوش مصنوعی، بهترین استعدادها را به بهترین شرکت‌ها متصل می‌کند.
-            </p>
-            <div className="flex gap-4">
+            <div className="text-sm leading-relaxed text-slate-500 max-w-xs space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+              <div>
+                <h4 className="font-extrabold text-slate-800 text-base mb-1">از یادگیری تا استخدام و رشد شغلی</h4>
+                <p className="font-medium text-slate-600 mb-3">جابیکس در تمام مسیر حرفه ای کنار شماست.</p>
+              </div>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /> طراحی مسیر شغلی متناسب با توانمندی های شما</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /> آموزش مهارت های کاربردی بازار کار</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /> ارتقای شغلی و آمادگی برای فرصت های بهتر</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" /> معرفی به بازار کار</li>
+              </ul>
+            </div>
+            
+            <div className="flex gap-4 pt-2">
               <a href="#" className="text-slate-400 hover:text-primary transition-colors">
                 <InstagramIcon className="h-6 w-6" />
               </a>
@@ -106,11 +112,11 @@ export function Footer() {
                 <ul className="mt-6 space-y-4">
                   <li className="flex items-center gap-2 text-sm text-slate-500">
                     <Phone className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span dir="ltr">۰۲۱ - ۸۸۸۸ ۸۸۸۸</span>
+                    <span dir="ltr">09010601610</span>
                   </li>
                   <li className="flex items-center gap-2 text-sm text-slate-500">
                     <Mail className="h-4 w-4 shrink-0 text-slate-400" />
-                    <a href="mailto:info@jobixx.ir" className="hover:text-primary transition-colors" dir="ltr">info@jobixx.ir</a>
+                    <a href="mailto:jobix1405@gmail.com" className="hover:text-primary transition-colors" dir="ltr">jobix1405@gmail.com</a>
                   </li>
                   <li className="flex items-start gap-2 text-sm text-slate-500">
                     <MapPin className="h-5 w-5 shrink-0 text-slate-400 mt-0.5" />
@@ -122,13 +128,11 @@ export function Footer() {
           </div>
         </div>
         
-        {/* --- نوار پایین فوتر (Bottom Bar) --- */}
+        {/* --- نوار پایین فوتر --- */}
         <div className="mt-16 border-t border-slate-200 pt-8 sm:mt-20 lg:mt-24 flex flex-col lg:flex-row justify-between items-center gap-6">
-          
           <p className="text-xs leading-5 text-slate-500 text-center lg:text-right">
             &copy; {new Date().toLocaleDateString('fa-IR', { year: 'numeric' })} تمامی حقوق برای پلتفرم هوشمند کاریابی جابیکس محفوظ است.
           </p>
-
           <a 
             href="https://kiyadev.ir" 
             target="_blank"
@@ -144,13 +148,11 @@ export function Footer() {
                 <Code2 className="h-3 w-3 text-secondary group-hover:text-orange-400" />
               </span>
             </div>
-            
             <div className="h-8 w-8 bg-white group-hover:bg-white/10 rounded-lg flex items-center justify-center shadow-sm transition-colors border border-slate-100 group-hover:border-transparent">
                <Code2 className="h-4 w-4 text-slate-600 group-hover:text-white" />
             </div>
           </a>
         </div>
-
       </div>
     </footer>
   );

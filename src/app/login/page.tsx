@@ -15,6 +15,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get('next'); 
   const isBannedError = searchParams.get('error') === 'banned';
+  const roleQuery = searchParams.get('role'); // 👈 دریافت پارامتر نقش از URL
   
   const supabase = createClient();
   const { setUser } = useStore();
@@ -91,8 +92,9 @@ function LoginForm() {
       // اگر کاربر نقشی نداشت (ثبت‌نام جدید)
       let intendedRole: "employer" | "job_seeker" | null = null;
       
-      if (nextUrl?.includes('employer')) intendedRole = 'employer';
-      else if (nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
+      // 👈 منطق هوشمند بررسی roleQuery علاوه بر nextUrl
+      if (roleQuery === 'employer' || nextUrl?.includes('employer')) intendedRole = 'employer';
+      else if (roleQuery === 'job_seeker' || nextUrl?.includes('job-seeker')) intendedRole = 'job_seeker';
 
       if (intendedRole) {
         // استفاده از upsert برای محکم‌کاری
@@ -101,6 +103,19 @@ function LoginForm() {
           phone_number: userPhone,
           role: intendedRole
         });
+
+        // 👈 اختصاص هدیه ثبت آگهی رایگان در صورتی که نقش کارفرما باشد
+        if (intendedRole === 'employer') {
+          const expireDate = new Date();
+          expireDate.setDate(expireDate.getDate() + 30);
+          
+          await supabase.from('employer_subscriptions').upsert({
+            employer_id: userId,
+            total_jobs: 1, 
+            used_jobs: 0,
+            expires_at: expireDate.toISOString()
+          }, { onConflict: 'employer_id' });
+        }
         
         setUser({
           id: userId,
@@ -296,7 +311,10 @@ function LoginForm() {
           {step === 1 && loginMethod === "otp" && (
             <form onSubmit={handleSendCode} className="space-y-6 animate-in fade-in duration-500">
               <div className="text-center">
-                <h2 className="text-2xl font-bold text-slate-900">ورود / ثبت‌نام</h2>
+                {/* 👈 تغییر متن تیتر بر اساس وجود roleQuery */}
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {roleQuery ? "ساخت حساب کاربری" : "ورود / ثبت‌نام"}
+                </h2>
                 <p className="mt-2 text-sm text-slate-500">
                   برای ادامه، شماره موبایل خود را وارد کنید
                 </p>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { SearchBox } from "@/components/shared/SearchBox";
 import { RoleCards } from "@/components/shared/RoleCards";
 import { TopCompanies } from "@/components/shared/TopCompanies";
-import { PopularCategories } from "@/components/shared/PopularCategories"; // 👈 ایمپورت کامپوننت جدید
+import { PopularCategories } from "@/components/shared/PopularCategories";
 import { 
   CheckCircle2, 
   TrendingUp, 
@@ -55,7 +55,7 @@ export default function HomePage() {
       <TopCompanies />
 
       {/* =======================
-          3. دسته‌بندی‌های پرطرفدار (فراخوانی کامپوننت ماژولار)
+          3. دسته‌بندی‌های پرطرفدار
       ======================= */}
       <PopularCategories />
 
@@ -81,15 +81,23 @@ export default function HomePage() {
               <ul className="mt-8 space-y-4">
                 <li className="flex items-center gap-3 text-slate-700 font-medium">
                   <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
-                  دسترسی به هزاران آگهی از شرکت‌های معتبر
+                  قابلیت چت و مذاکره مستقیم با کارفرما
                 </li>
                 <li className="flex items-center gap-3 text-slate-700 font-medium">
                   <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
-                  پیگیری زنده وضعیت درخواست‌های شغلی
+                  موقعیت آنلاین شرکت‌ها روی نقشه
                 </li>
                 <li className="flex items-center gap-3 text-slate-700 font-medium">
                   <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
-                  کاملاً رایگان برای تمام کارجویان
+                  اطلاع از درخواست‌های کاری جدید
+                </li>
+                <li className="flex items-center gap-3 text-slate-700 font-medium">
+                  <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
+                  معرفی مسیر شغلی و آموزش جهت ارتقا و افزایش مهارت‌ها و معرفی به بازار کار
+                </li>
+                <li className="flex items-center gap-3 text-slate-700 font-medium">
+                  <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
+                  شبکه معرفی استعداد و دریافت پاداش
                 </li>
               </ul>
 
@@ -172,15 +180,15 @@ export default function HomePage() {
               <ul className="mt-8 space-y-4">
                 <li className="flex items-center gap-3 text-slate-700 font-medium">
                   <CheckCircle2 className="h-6 w-6 text-secondary shrink-0" />
-                  ثبت آگهی استخدام در کمتر از ۳ دقیقه
+                  موقعیت آنلاین استعدادها و جستجوی نیروهای نزدیک شما روی نقشه
                 </li>
                 <li className="flex items-center gap-3 text-slate-700 font-medium">
                   <CheckCircle2 className="h-6 w-6 text-secondary shrink-0" />
-                  فیلترینگ پیشرفته رزومه‌ها و سیستم امتیازدهی
+                  قابلیت چت و مذاکره مستقیم
                 </li>
                 <li className="flex items-center gap-3 text-slate-700 font-medium">
                   <CheckCircle2 className="h-6 w-6 text-secondary shrink-0" />
-                  پشتیبانی اختصاصی شرکت‌ها
+                  جستجوی سریع نیروهای روزمزدی و عملیاتی (خدماتی، نظافتی، رستورانی و ...)
                 </li>
               </ul>
 
@@ -253,12 +261,7 @@ export default function HomePage() {
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/login" className="w-full sm:w-auto">
               <Button size="lg" className="w-full bg-secondary text-white hover:bg-secondary/90 shadow-xl shadow-secondary/30 px-10 h-14 rounded-xl text-lg font-bold border-none">
-                عضویت رایگان در جابیکس
-              </Button>
-            </Link>
-            <Link href="/jobs" className="w-full sm:w-auto">
-              <Button variant="outline" size="lg" className="w-full bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white px-10 h-14 rounded-xl text-lg font-bold backdrop-blur-md">
-                مشاهده آگهی‌های شغلی
+                مسیر شغلی من را شروع کن
               </Button>
             </Link>
           </div>

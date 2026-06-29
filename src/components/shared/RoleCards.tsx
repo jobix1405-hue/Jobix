@@ -6,8 +6,8 @@ export function RoleCards() {
     <div className="mx-auto mt-12 grid w-full max-w-3xl grid-cols-1 gap-5 sm:grid-cols-2">
       
       {/* کارت اول - کارفرما */}
-      {/* با کلیک به پنل کارفرما یا صفحه ثبت آگهی می‌رود */}
-      <Link href="/employer" className="group flex items-center gap-4 rounded-2xl bg-primary p-6 text-right text-white shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/30">
+      {/* 👈 لینک هوشمند: نقش در URL پاس داده می‌شود */}
+      <Link href="/login?role=employer" className="group flex items-center gap-4 rounded-2xl bg-primary p-6 text-right text-white shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/30">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/10">
           <Building2 className="h-7 w-7" aria-hidden="true" />
         </span>
@@ -24,8 +24,8 @@ export function RoleCards() {
       </Link>
 
       {/* کارت دوم - کارجو */}
-      {/* با کلیک به صفحه جستجوی مشاغل می‌رود */}
-      <Link href="/jobs" className="group flex items-center gap-4 rounded-2xl border-2 border-secondary/40 bg-white p-6 text-right text-primary shadow-lg shadow-secondary/5 transition-all duration-300 hover:-translate-y-1 hover:border-secondary hover:shadow-xl hover:shadow-secondary/15">
+      {/* 👈 لینک هوشمند: نقش در URL پاس داده می‌شود */}
+      <Link href="/login?role=job_seeker" className="group flex items-center gap-4 rounded-2xl border-2 border-secondary/40 bg-white p-6 text-right text-primary shadow-lg shadow-secondary/5 transition-all duration-300 hover:-translate-y-1 hover:border-secondary hover:shadow-xl hover:shadow-secondary/15">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
           <Briefcase className="h-7 w-7" aria-hidden="true" />
         </span>
