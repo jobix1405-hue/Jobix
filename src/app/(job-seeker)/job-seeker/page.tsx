@@ -16,7 +16,8 @@ import {
   Sparkles,
   RefreshCw,
   Search,
-  Rocket
+  Target,
+  ArrowUpLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
@@ -100,6 +101,7 @@ export default function JobSeekerDashboard() {
 
         if (profile) {
           const searchTerms = `${profile.job_title || ''} ${profile.skills ? profile.skills.split(',').join(' ') : ''}`.trim();
+          
           if (searchTerms) {
             jobsQuery = jobsQuery.textSearch('fts_doc', searchTerms, { type: 'websearch', config: 'simple' });
           }
@@ -125,7 +127,7 @@ export default function JobSeekerDashboard() {
 
           const topRecommendations = scoredJobs
             .sort((a, b) => b.match - a.match)
-            .slice(0, 4); // تعداد نمایش رو کردیم ۴ تا
+            .slice(0, 4);
 
           setRecommendedJobs(topRecommendations);
         }
@@ -155,6 +157,7 @@ export default function JobSeekerDashboard() {
       if (error) throw error;
       setWorkStatus(statusId);
     } catch (err) {
+      console.error(err);
       alert("خطا در تغییر وضعیت اشتغال");
     } finally {
       setIsUpdatingStatus(false);
@@ -173,7 +176,7 @@ export default function JobSeekerDashboard() {
   return (
     <div className="mx-auto max-w-6xl animate-in fade-in duration-500 space-y-8 pb-10">
       
-      {/* 1. هدر داشبورد */}
+      {/* 1. هدر داشبورد و تغییر وضعیت */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">سلام {userName}، وقت بخیر 👋</h1>
@@ -197,7 +200,7 @@ export default function JobSeekerDashboard() {
               <button
                 key={s.id}
                 onClick={() => handleUpdateWorkStatus(s.id)}
-                className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all ${
                   workStatus === s.id ? s.activeClass + " shadow-sm border border-black/5" : "text-slate-500 hover:bg-slate-50"
                 }`}
               >
@@ -208,180 +211,200 @@ export default function JobSeekerDashboard() {
         </div>
       </div>
 
-      {/* 2. بنر عظیم و خیره‌کننده جستجوی مشاغل (حل مشکل UX) */}
-      <div className="bg-gradient-to-r from-primary to-blue-800 rounded-[2rem] p-8 sm:p-10 text-white shadow-xl shadow-primary/20 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
-        {/* پترن‌های پس‌زمینه بنر */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-blue-400/30 blur-3xl"></div>
-        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-secondary/20 blur-3xl"></div>
+      {/* =======================================================
+          2. بنر فوق‌العاده جذاب و خلاقانه جستجوی مشاغل
+          تضاد رنگی (سفید روی دارک) کاملاً رعایت شده است
+      ======================================================= */}
+      <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 sm:p-12 shadow-2xl border border-slate-800">
+        
+        {/* افکت‌های نوری پس‌زمینه */}
+        <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-primary/40 blur-[80px]"></div>
+        <div className="absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-secondary/30 blur-[80px]"></div>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
 
-        <div className="relative z-10 flex-1 text-center md:text-right">
-          <h2 className="text-2xl sm:text-3xl font-extrabold mb-3 flex items-center justify-center md:justify-start gap-2">
-            <Rocket className="h-8 w-8 text-amber-400" />
-            شغل رویایی شما همینجاست!
-          </h2>
-          <p className="text-blue-100 max-w-xl leading-relaxed text-sm sm:text-base mx-auto md:mx-0 text-justify">
-            از میان هزاران آگهی شغلی فعال در جابیکس، فرصت مناسب خود را پیدا کنید. می‌توانید به صورت لیستی جستجو کنید یا آگهی‌های اطراف خود را به صورت زنده روی نقشه ببینید.
-          </p>
-        </div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+          
+          {/* متن بنر */}
+          <div className="flex-1 text-center md:text-right">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-blue-200 text-xs font-bold mb-5 backdrop-blur-md shadow-inner">
+              <Sparkles className="h-4 w-4 text-amber-400" /> فصل جدید مسیر حرفه‌ای شما
+            </div>
+            
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight mb-4 tracking-tight">
+              شغل رویایی خود را <br className="hidden sm:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">هوشمندانه شکار کنید!</span>
+            </h2>
+            
+            <p className="text-slate-400 max-w-xl leading-relaxed text-sm sm:text-base mx-auto md:mx-0 text-justify font-medium">
+              از میان هزاران فرصت شغلی در معتبرترین شرکت‌های ایران، دقیقاً همان شغلی که با استعداد و مهارت‌های شما همخوانی دارد را پیدا کنید.
+            </p>
+          </div>
 
-        <div className="relative z-10 flex flex-col sm:flex-row gap-4 w-full md:w-auto shrink-0">
-          <Link href="/jobs" className="w-full sm:w-auto">
-             <Button className="w-full bg-white text-primary hover:bg-slate-50 h-14 px-8 rounded-2xl font-bold shadow-lg text-base border-none transition-transform hover:scale-105">
-                <Search className="ml-2 h-5 w-5" /> جستجوی تمام آگهی‌ها
-             </Button>
-          </Link>
-          <Link href="/jobs/map" className="w-full sm:w-auto">
-             <Button className="w-full bg-blue-700/50 hover:bg-blue-600 text-white border border-blue-400/30 h-14 px-6 rounded-2xl font-bold shadow-lg backdrop-blur-sm transition-transform hover:scale-105">
-                <Map className="ml-2 h-5 w-5" /> جستجو روی نقشه
-             </Button>
-          </Link>
+          {/* دکمه‌های اکشن (کنتراست عالی) */}
+          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto shrink-0 mt-2 md:mt-0">
+            <Link href="/jobs" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto bg-white text-slate-900 hover:bg-slate-100 h-14 px-8 rounded-2xl font-extrabold shadow-xl shadow-white/10 transition-transform hover:scale-105 border-0">
+                <Search className="ml-2 h-5 w-5 text-primary" /> جستجوی تمام آگهی‌ها
+              </Button>
+            </Link>
+            <Link href="/jobs/map" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 h-14 px-6 rounded-2xl font-bold backdrop-blur-md transition-transform hover:scale-105">
+                <Map className="ml-2 h-5 w-5 text-blue-300" /> نقشه مشاغل زنده
+              </Button>
+            </Link>
+          </div>
+
         </div>
       </div>
 
       {/* 3. کارت‌های آماری */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-              <Briefcase className="h-6 w-6" />
+            <div className="h-14 w-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
+              <Briefcase className="h-7 w-7" />
             </div>
           </div>
           <p className="text-sm font-medium text-slate-500">درخواست‌های ارسال شده</p>
-          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{stats.applied}</h3>
+          <h3 className="text-4xl font-extrabold text-slate-900 mt-2">{stats.applied}</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md opacity-80">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
-              <Eye className="h-6 w-6" />
+            <div className="h-14 w-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+              <Eye className="h-7 w-7" />
             </div>
           </div>
           <p className="text-sm font-medium text-slate-500">بازدید کارفرمایان از رزومه</p>
-          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{stats.views}</h3>
+          <h3 className="text-4xl font-extrabold text-slate-900 mt-2">{stats.views}</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
-              <Bookmark className="h-6 w-6" />
+            <div className="h-14 w-14 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 border border-orange-100">
+              <Bookmark className="h-7 w-7" />
             </div>
           </div>
           <p className="text-sm font-medium text-slate-500">آگهی‌های نشان‌شده</p>
-          <h3 className="text-3xl font-extrabold text-slate-900 mt-2">{stats.saved}</h3>
+          <h3 className="text-4xl font-extrabold text-slate-900 mt-2">{stats.saved}</h3>
         </div>
       </div>
 
-      {/* 4. بخش‌های پایینی (مدیریت شده و مهندسی شده) */}
+      {/* 4. بخش‌های پایینی */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* ستون راست و وسط: درخواست‌ها و تکمیل پروفایل */}
+        {/* ستون راست و وسط */}
         <div className="lg:col-span-2 space-y-6">
           
+          {/* کارت وضعیت رزومه */}
+          {stats.profileCompletion < 100 && (
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-orange-200 bg-gradient-to-r from-orange-50/50 to-white shadow-sm relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="flex-1 w-full">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-5 w-5 text-orange-500" />
+                  رزومه شما هنوز کامل نیست! ({stats.profileCompletion}٪)
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed text-justify">
+                  کارفرمایان به رزومه‌هایی که بالای ۸۰٪ تکمیل شده‌اند توجه بیشتری نشان می‌دهند. برای شانس استخدام بالاتر، اطلاعات خود را کامل کنید.
+                </p>
+                
+                <div className="mt-5 h-2.5 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                  <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-1000" style={{ width: `${stats.profileCompletion}%` }}></div>
+                </div>
+              </div>
+              <Link href="/job-seeker/resume" className="w-full sm:w-auto shrink-0">
+                <Button className="w-full h-12 shadow-lg shadow-orange-600/20 bg-orange-600 hover:bg-orange-700 border-none font-bold px-8">
+                  تکمیل رزومه
+                </Button>
+              </Link>
+            </div>
+          )}
+
           {/* کارت درخواست‌های اخیر */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm h-full">
             <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
               <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                آخرین درخواست‌های شما
+                <Target className="h-5 w-5 text-primary" />
+                آخرین درخواست‌های ارسالی
               </h3>
-              <Link href="/job-seeker/applications" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+              <Link href="/job-seeker/applications" className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
                 مشاهده همه <ChevronLeft className="h-4 w-4" />
               </Link>
             </div>
 
             <div className="space-y-4">
               {recentApps.map((app) => (
-                <div key={app.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors gap-4">
+                <div key={app.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 transition-all gap-4 group">
                   <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center text-lg font-bold text-slate-400">
+                    <div className="h-12 w-12 shrink-0 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-200 group-hover:bg-white transition-colors">
                       <Building2 className="h-6 w-6" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-900">{app.role}</h4>
-                      <p className="text-sm text-slate-500 mt-1">{app.company}</p>
+                      <h4 className="font-bold text-slate-900 group-hover:text-primary transition-colors">{app.role}</h4>
+                      <p className="text-sm font-medium text-slate-500 mt-1">{app.company}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center justify-between sm:w-1/3 border-t sm:border-0 border-slate-100 pt-3 sm:pt-0">
                     {getStatusBadge(app.status)}
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {app.date}
+                    <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" /> {app.date}
                     </span>
                   </div>
                 </div>
               ))}
               
               {recentApps.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <Briefcase className="h-10 w-10 text-slate-300 mb-3" />
-                  <p className="text-sm text-slate-500">هنوز برای هیچ شغلی رزومه ارسال نکرده‌اید.</p>
+                <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50">
+                  <Briefcase className="h-12 w-12 text-slate-300 mb-3" />
+                  <p className="text-sm font-medium text-slate-500">شما هنوز برای هیچ شغلی رزومه ارسال نکرده‌اید.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* کارت تکمیل پروفایل */}
-          {stats.profileCompletion < 100 && (
-            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-orange-200 bg-gradient-to-r from-orange-50/50 to-white shadow-sm relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div className="flex-1">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-2">
-                  <AlertCircle className="h-5 w-5 text-orange-500" />
-                  رزومه شما کامل نیست! ({stats.profileCompletion}٪)
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed text-justify">
-                  کارفرمایان به رزومه‌هایی که بالای ۸۰٪ تکمیل شده‌اند توجه بیشتری نشان می‌دهند. لطفاً مهارت‌ها و سوابق خود را تکمیل کنید.
-                </p>
-                
-                <div className="mt-4 h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-orange-500 rounded-full transition-all duration-1000" style={{ width: `${stats.profileCompletion}%` }}></div>
-                </div>
-              </div>
-              <Link href="/job-seeker/resume" className="w-full sm:w-auto shrink-0">
-                <Button className="w-full shadow-md bg-orange-600 hover:bg-orange-700 border-none">
-                  تکمیل رزومه
-                </Button>
-              </Link>
-            </div>
-          )}
         </div>
 
         {/* ستون چپ: پیشنهادهای هوشمند */}
         <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-3xl border border-primary/20 shadow-md relative overflow-hidden h-full">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary"></div>
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden h-full">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-blue-400 to-secondary"></div>
             
             <h3 className="font-bold text-slate-900 mb-6 pb-4 border-b border-slate-100 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-500" />
-              پیشنهادهای هوشمند (AI)
+              هوش مصنوعی جابیکس
             </h3>
+            <p className="text-xs text-slate-500 mb-6 text-justify leading-relaxed font-medium">
+              بر اساس مهارت‌ها و رزومه شما، این موقعیت‌های شغلی بالاترین شانس استخدام را برای شما دارند:
+            </p>
             
             <div className="space-y-4">
               {recommendedJobs.map((job) => (
                 <Link key={job.id} href={`/jobs/${job.id}`} className="group block">
-                  <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 transition-all hover:border-primary/30 hover:bg-white hover:shadow-md">
+                  <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 transition-all hover:border-primary/40 hover:bg-white hover:shadow-md">
                     <h4 className="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors line-clamp-1">{job.title}</h4>
-                    <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1 line-clamp-1">
-                      <Building2 className="h-3 w-3 shrink-0" /> {job.company}
+                    <p className="text-xs font-medium text-slate-500 mt-2 flex items-center gap-1.5 line-clamp-1">
+                      <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" /> {job.company}
                     </p>
                     <div className="mt-4 flex items-center justify-between">
-                      <span className={`text-[11px] font-bold px-2 py-1 rounded-md ${
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${
                         job.match >= 75 ? "bg-green-100 text-green-700 border border-green-200" :
                         job.match >= 50 ? "bg-blue-100 text-blue-700 border border-blue-200" :
                         "bg-orange-100 text-orange-700 border border-orange-200"
                       }`}>
-                        تطابق: {job.match}٪
+                        تطابق رزومه: {job.match}٪
                       </span>
-                      <ChevronLeft className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                      <ArrowUpLeft className="h-4 w-4 text-slate-400 group-hover:text-primary transition-transform group-hover:-translate-y-0.5 group-hover:-translate-x-0.5" />
                     </div>
                   </div>
                 </Link>
               ))}
+              
               {recommendedJobs.length === 0 && (
                 <div className="py-10 text-center">
                   <AlertCircle className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    با تکمیل مهارت‌ها در رزومه خود، هوش مصنوعی جابیکس بهترین آگهی‌ها را به شما پیشنهاد می‌دهد.
+                  <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                    با تکمیل فیلد مهارت‌ها در رزومه خود، هوش مصنوعی ما بهترین آگهی‌ها را پیدا می‌کند.
                   </p>
                 </div>
               )}
