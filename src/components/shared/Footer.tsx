@@ -29,31 +29,20 @@ export function Footer() {
               </Link>
             </div>
 
-            <div className="text-sm leading-relaxed text-slate-500 max-w-xs space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <h4 className="font-extrabold text-slate-800 text-lg mb-1">بازار هوشمند استخدام ایران</h4>
-              <p className="font-bold text-primary mb-3 text-sm">مرجع رسانه‌ای منابع انسانی</p>
-            </div>
+            <p className="text-sm leading-relaxed text-slate-500 max-w-xs">
+              <strong className="text-slate-700 font-bold text-base">بازار هوشمند استخدام ایران</strong>
+              <br />
+              <span className="font-medium mt-1 inline-block">مرجع رسانه‌ای منابع انسانی</span>
+            </p>
             
-            {/* راه‌های ارتباطی و شبکه‌های اجتماعی جدید */}
-            <div className="flex flex-col gap-3 pt-2">
-              <span className="text-xs font-bold text-slate-400 mb-1">راه‌های ارتباطی و رسانه‌ها:</span>
-              <div className="flex flex-wrap items-center gap-4">
-                <a href="https://t.me/jobixxhr" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl hover:border-[#2AABEE] hover:bg-blue-50 transition-colors">
-                  <Image src="/icons/telegram_icon.png" alt="Telegram" width={24} height={24} className="group-hover:scale-110 transition-transform" />
-                  <div className="flex flex-col text-right">
-                    <span className="text-[10px] text-slate-500 group-hover:text-[#2AABEE]">کانال تلگرام</span>
-                    <span className="text-xs font-bold text-slate-700" dir="ltr">@jobixxhr</span>
-                  </div>
-                </a>
-
-                <a href="https://ble.ir/jobixx" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl hover:border-[#22C55E] hover:bg-green-50 transition-colors">
-                  <Image src="/icons/bale.png" alt="Bale" width={24} height={24} className="group-hover:scale-110 transition-transform rounded-full" />
-                  <div className="flex flex-col text-right">
-                    <span className="text-[10px] text-slate-500 group-hover:text-[#22C55E]">پیام‌رسان بله</span>
-                    <span className="text-xs font-bold text-slate-700" dir="ltr">@jobixx</span>
-                  </div>
-                </a>
-              </div>
+            {/* راه‌های ارتباطی و رسانه‌ها */}
+            <div className="flex items-center gap-4 pt-2">
+              <a href="https://t.me/jobixxhr" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300">
+                <Image src="/icons/telegram_icon.png" alt="Telegram" width={26} height={26} />
+              </a>
+              <a href="https://ble.ir/jobixx" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300">
+                <Image src="/icons/bale.png" alt="Bale" width={26} height={26} className="rounded-full" />
+              </a>
             </div>
           </div>
 
