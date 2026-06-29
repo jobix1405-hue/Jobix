@@ -36,17 +36,21 @@ const getStatusBadge = (status: string) => {
 export default function JobSeekerDashboard() {
   const supabase = createClient();
   
+  // برای جلوگیری از ارور رندر اولیه هوک Zustand، آن را اینجا می‌گیریم
   const [userId, setUserId] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState("کارجو");
   const [stats, setStats] = useState({ applied: 0, views: 0, saved: 0, profileCompletion: 0 });
   const [recentApps, setRecentApps] = useState<any[]>([]);
   const [recommendedJobs, setRecommendedJobs] = useState<any[]>([]);
   
+  // استیت‌های جدید وضعیت اشتغال
   const [workStatus, setWorkStatus] = useState<string>("ready");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
+    // گرفتن کاربر از سشن بجای استور برای جلوگیری از مشکلات کلاینت
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) setUserId(user.id);
     });
@@ -62,6 +66,8 @@ export default function JobSeekerDashboard() {
         
         if (profile) {
           if (profile.first_name) setUserName(profile.first_name);
+          
+          // ست کردن وضعیت اشتغال کاربر از دیتابیس
           if (profile.work_status) setWorkStatus(profile.work_status);
           
           const checkFields = ['first_name', 'last_name', 'job_title', 'about_me', 'skills', 'university', 'last_company'];
@@ -99,10 +105,12 @@ export default function JobSeekerDashboard() {
           .select('id, title, description, profiles(company_name)')
           .eq('status', 'active');
 
+        // ترکیب عنوان و مهارت‌ها برای جستجوی متنی فول‌تکست
         if (profile) {
           const searchTerms = `${profile.job_title || ''} ${profile.skills ? profile.skills.split(',').join(' ') : ''}`.trim();
           
           if (searchTerms) {
+            // استفاده از موتور جستجوی متنی دیتابیس به جای لود کل جدول
             jobsQuery = jobsQuery.textSearch('fts_doc', searchTerms, { type: 'websearch', config: 'simple' });
           }
         }
@@ -127,7 +135,7 @@ export default function JobSeekerDashboard() {
 
           const topRecommendations = scoredJobs
             .sort((a, b) => b.match - a.match)
-            .slice(0, 4);
+            .slice(0, 3);
 
           setRecommendedJobs(topRecommendations);
         }
@@ -149,6 +157,7 @@ export default function JobSeekerDashboard() {
     fetchDashboardData();
   }, [userId, supabase]);
 
+  // هندلر تغییر وضعیت اشتغال با کلیک دکمه
   const handleUpdateWorkStatus = async (statusId: string) => {
     if (!userId || isUpdatingStatus) return;
     setIsUpdatingStatus(true);
@@ -186,6 +195,8 @@ export default function JobSeekerDashboard() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3">
+          
+          {/* ویجت تعاملی تغییر وضعیت اشتغال در هدر */}
           <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden w-full sm:w-auto">
             {isUpdatingStatus && (
               <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10">
@@ -208,12 +219,17 @@ export default function JobSeekerDashboard() {
               </button>
             ))}
           </div>
+
+          <Link href="/jobs/map" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto rounded-xl h-10 bg-white border-slate-200 text-slate-700 hover:text-primary hover:border-primary shadow-sm">
+              <Map className="ml-2 h-4 w-4" /> نقشه مشاغل
+            </Button>
+          </Link>
         </div>
       </div>
 
       {/* =======================================================
           2. بنر فوق‌العاده جذاب و خلاقانه جستجوی مشاغل
-          تضاد رنگی (سفید روی دارک) کاملاً رعایت شده است
       ======================================================= */}
       <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 sm:p-12 shadow-2xl border border-slate-800">
         
@@ -240,15 +256,15 @@ export default function JobSeekerDashboard() {
             </p>
           </div>
 
-          {/* دکمه‌های اکشن (کنتراست عالی) */}
+          {/* دکمه‌های اکشن (باگ تداخل رنگ دکمه در اینجا برطرف شد) */}
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto shrink-0 mt-2 md:mt-0">
             <Link href="/jobs" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto bg-white text-slate-900 hover:bg-slate-100 h-14 px-8 rounded-2xl font-extrabold shadow-xl shadow-white/10 transition-transform hover:scale-105 border-0">
+              <Button className="w-full sm:w-auto !bg-white !text-slate-900 hover:!bg-slate-100 h-14 px-8 rounded-2xl font-extrabold shadow-xl shadow-white/10 transition-transform hover:scale-105 border-0">
                 <Search className="ml-2 h-5 w-5 text-primary" /> جستجوی تمام آگهی‌ها
               </Button>
             </Link>
             <Link href="/jobs/map" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 h-14 px-6 rounded-2xl font-bold backdrop-blur-md transition-transform hover:scale-105">
+              <Button className="w-full sm:w-auto !bg-white/10 hover:!bg-white/20 !text-white border border-white/20 h-14 px-6 rounded-2xl font-bold backdrop-blur-md transition-transform hover:scale-105">
                 <Map className="ml-2 h-5 w-5 text-blue-300" /> نقشه مشاغل زنده
               </Button>
             </Link>
