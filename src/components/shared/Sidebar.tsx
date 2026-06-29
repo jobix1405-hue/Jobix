@@ -18,7 +18,8 @@ import {
   Layers,
   Package,
   AlertTriangle,
-  GraduationCap
+  GraduationCap,
+  Megaphone // 👈 این آیکون اضافه شد
 } from "lucide-react";
 
 interface SidebarItem {
@@ -57,7 +58,8 @@ export function Sidebar({ role }: SidebarProps) {
       { name: "دسته‌بندی‌های شغلی", href: "/admin/categories", icon: Layers },
       { name: "مدیریت تعرفه‌ها", href: "/admin/packages", icon: Package },
       { name: "گزارشات مالی", href: "/admin/transactions", icon: CreditCard },
-      { name: "گزارشات تخلف", href: "/admin/reports", icon: AlertTriangle }, // 👈 لینک جدید مدیریت گزارشات
+      { name: "گزارشات تخلف", href: "/admin/reports", icon: AlertTriangle },
+      { name: "اطلاع‌رسانی سراسری", href: "/admin/announcements", icon: Megaphone }, // 👈 این لینک اضافه شد
     ];
   } else if (role === "employer") {
     links = [
@@ -71,7 +73,7 @@ export function Sidebar({ role }: SidebarProps) {
     links = [
       { name: "پیشخوان", href: "/job-seeker", icon: LayoutDashboard },
       { name: "رزومه من", href: "/job-seeker/resume", icon: Briefcase },
-      { name: "آکادمی و مسیر شغلی", href: "/job-seeker/academy", icon: GraduationCap }, // 👈 این خط اضافه شد
+      { name: "آکادمی و مسیر شغلی", href: "/job-seeker/academy", icon: GraduationCap },
       { name: "آگهی‌های نشان‌شده", href: "/job-seeker/saved-jobs", icon: Bookmark },
       { name: "درخواست‌های من", href: "/job-seeker/applications", icon: Users },
       { name: "پیام‌ها", href: "/job-seeker/messages", icon: MessageSquare },
