@@ -38,7 +38,7 @@ export function Footer() {
             {/* راه‌های ارتباطی و رسانه‌ها */}
             <div className="flex items-center gap-4 pt-2">
               <a href="https://t.me/jobixxhr" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300">
-                <Image src="/icons/telegram_icon.png" alt="Telegram" width={26} height={26} />
+                <Image src="/icons/telegram.png" alt="Telegram" width={26} height={26} />
               </a>
               <a href="https://ble.ir/jobixx" target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-300">
                 <Image src="/icons/bale.png" alt="Bale" width={26} height={26} className="rounded-full" />
