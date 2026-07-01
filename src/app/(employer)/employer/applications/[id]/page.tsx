@@ -1,12 +1,10 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   User, Briefcase, GraduationCap, Code, 
   ChevronRight, Phone, Mail, FileText, Loader2, MessageSquare,
-  Star, Award, CheckCircle2, AlertCircle
+  Star, Award, CheckCircle2, AlertCircle, Clock, Video
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -29,6 +27,7 @@ interface ApplicantProfile {
   email: string;
   avatar_url: string;
   work_status: string; // 👈 فیلد جدید
+  video_resume_url: string;
 }
 
 const SEEKER_BADGES = [
@@ -36,6 +35,14 @@ const SEEKER_BADGES = [
   { id: "responsible", label: "مسئولیت‌پذیر" },
   { id: "professional", label: "متخصص و حرفه‌ای" },
   { id: "team_player", label: "روحیه کار تیمی" },
+];
+
+// 👈 معیارهای امتیازدهی چندگانه به کارجو
+const SEEKER_CRITERIA = [
+  { id: "punctuality", label: "نظم و وقت‌شناسی" },
+  { id: "expertise", label: "تخصص و مهارت فنی" },
+  { id: "communication", label: "برخورد و اخلاق حرفه‌ای" },
+  { id: "teamwork", label: "روحیه کار تیمی" },
 ];
 
 // 👈 تابع نمایش وضعیت اشتغال
@@ -60,11 +67,12 @@ export default function ApplicantProfilePage() {
 
   const [profile, setProfile] = useState<ApplicantProfile | null>(null);
   const [ratings, setRatings] = useState<any[]>([]);
+  const [completedCourses, setCompletedCourses] = useState<{ id: string; title: string; duration: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
-  const [score, setScore] = useState<number>(0);
+  const [criteriaScores, setCriteriaScores] = useState<Record<string, number>>({});
   const [selectedBadge, setSelectedBadge] = useState<string>("");
   const [reviewText, setReviewText] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
@@ -87,6 +95,18 @@ export default function ApplicantProfilePage() {
           .eq('ratee_id', params.id as string);
 
         if (ratingsData) setRatings(ratingsData);
+
+        const { data: coursesData } = await supabase
+          .from('course_requests')
+          .select('id, course:courses(id, title, duration)')
+          .eq('job_seeker_id', params.id as string)
+          .eq('status', 'completed');
+
+        const formattedCourses = (coursesData || []).map((req: any) => {
+          const course = Array.isArray(req.course) ? req.course[0] : req.course;
+          return { id: course?.id || req.id, title: course?.title || 'دوره نامشخص', duration: course?.duration || '' };
+        });
+        setCompletedCourses(formattedCourses);
 
       } catch (err) {
         console.error("Error fetching applicant profile:", err);
@@ -132,14 +152,23 @@ export default function ApplicantProfilePage() {
   const handleSubmitRating = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id || !profile?.id) return;
-    if (score === 0 || !selectedBadge) return alert("لطفاً هم امتیاز ستاره‌ای و هم نشان را انتخاب کنید.");
+
+    const filledCriteria = SEEKER_CRITERIA.filter(c => criteriaScores[c.id] > 0);
+    if (filledCriteria.length < SEEKER_CRITERIA.length || !selectedBadge) {
+      return alert("لطفاً به همه معیارها امتیاز دهید و یک نشان را انتخاب کنید.");
+    }
+
+    const avgScore = Math.round(
+      (Object.values(criteriaScores).reduce((a, b) => a + b, 0) / SEEKER_CRITERIA.length) * 10
+    ) / 10;
 
     setIsSubmittingRating(true);
     try {
       const { error } = await supabase.from('ratings').insert({
         rater_id: user.id,
         ratee_id: profile.id,
-        score,
+        score: avgScore,
+        criteria_scores: criteriaScores,
         badge: selectedBadge,
         review_text: reviewText
       });
@@ -149,8 +178,9 @@ export default function ApplicantProfilePage() {
         throw error;
       }
 
-      setRatings([...ratings, { score, badge: selectedBadge, review_text: reviewText }]);
+      setRatings([...ratings, { score: avgScore, criteria_scores: criteriaScores, badge: selectedBadge, review_text: reviewText }]);
       setIsRatingModalOpen(false);
+      setCriteriaScores({});
       
     } catch (err: any) {
       alert(err.message || "خطا در ثبت ارزیابی.");
@@ -178,16 +208,16 @@ export default function ApplicantProfilePage() {
   }, {});
 
   return (
-    <div className="mx-auto max-w-4xl animate-in fade-in duration-500 pb-10">
-      <Link href="/employer/applications" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-primary mb-6">
+    <div className="mx-auto max-w-4xl animate-in fade-in duration-500 pb-6">
+      <Link href="/employer/applications" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-primary mb-4">
         <ChevronRight className="h-4 w-4" /> بازگشت به برد کانبان
       </Link>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="h-24 bg-gradient-to-r from-primary/10 to-transparent"></div>
-          <div className="px-6 pb-8 pt-0 sm:px-10">
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+          <div className="px-4 pb-6 pt-0 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div className="flex items-end gap-5 -mt-10">
                 <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-white border-4 border-white shadow-md text-4xl font-bold text-slate-300 overflow-hidden relative">
                   {profile.avatar_url ? <img src={profile.avatar_url} alt="avatar" className="h-full w-full object-cover" /> : <User className="h-10 w-10" />}
@@ -206,14 +236,14 @@ export default function ApplicantProfilePage() {
                 <Button variant="outline" onClick={() => setIsRatingModalOpen(true)} className="rounded-xl px-4 border-orange-200 text-orange-600 hover:bg-orange-50">
                   <Star className="h-4 w-4 ml-2 fill-orange-500 text-orange-500" /> ارزیابی کارجو
                 </Button>
-                <Button onClick={handleStartChat} isLoading={isStartingChat} className="rounded-xl px-6">
+                <Button onClick={handleStartChat} isLoading={isStartingChat} className="rounded-xl px-4">
                   <MessageSquare className="h-4 w-4 ml-2" /> ارسال پیام
                 </Button>
               </div>
             </div>
 
             {(ratings.length > 0) && (
-              <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-6">
+              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4">
                 <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-xl">
                   <Star className="h-5 w-5 fill-orange-500 text-orange-500" />
                   <span className="font-extrabold text-orange-700">{avgScore}</span>
@@ -234,7 +264,7 @@ export default function ApplicantProfilePage() {
               </div>
             )}
             
-            <div className="mt-6 flex flex-wrap gap-4 border-t border-slate-100 pt-6">
+            <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 pt-4">
               <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700">
                 <Phone className="h-5 w-5 text-slate-400" /> <span dir="ltr">{profile.phone_number || 'نامشخص'}</span>
               </div>
@@ -248,7 +278,7 @@ export default function ApplicantProfilePage() {
         </div>
 
         {profile.about_me && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
               <User className="h-5 w-5 text-primary" /> درباره من
             </h2>
@@ -256,9 +286,9 @@ export default function ApplicantProfilePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-4">
               <Briefcase className="h-5 w-5 text-secondary" /> آخرین سابقه شغلی
             </h2>
             {profile.last_company ? (
@@ -271,8 +301,8 @@ export default function ApplicantProfilePage() {
             )}
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-4">
               <GraduationCap className="h-5 w-5 text-blue-500" /> آخرین مدرک تحصیلی
             </h2>
             {profile.university ? (
@@ -288,9 +318,29 @@ export default function ApplicantProfilePage() {
           </div>
         </div>
 
+        {completedCourses.length > 0 && (
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-4">
+              <Award className="h-5 w-5 text-purple-500" /> دوره‌های آموزشی تکمیل‌شده
+            </h2>
+            <div className="space-y-3">
+              {completedCourses.map((course) => (
+                <div key={course.id} className="flex items-center justify-between bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+                  <span className="font-bold text-slate-800 text-sm">{course.title}</span>
+                  {course.duration && (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                      <Clock className="h-3.5 w-3.5" /> {course.duration}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {profile.skills && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-4">
               <Code className="h-5 w-5 text-green-500" /> مهارت‌های تخصصی
             </h2>
             <div className="flex flex-wrap gap-2">
@@ -302,24 +352,44 @@ export default function ApplicantProfilePage() {
             </div>
           </div>
         )}
+
+        {/* 👈 ویدیوی معرفی کارجو - در پایین صفحه مشاهده رزومه، بدون نیاز به خروج از صفحه */}
+        {profile.video_resume_url && (
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-4">
+              <Video className="h-5 w-5 text-primary" /> ویدیوی معرفی کارجو
+            </h2>
+            <video
+              src={profile.video_resume_url}
+              controls
+              className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-200 shadow-sm bg-black block"
+            >
+              مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+            </video>
+          </div>
+        )}
       </div>
 
       <Modal isOpen={isRatingModalOpen} onClose={() => !isSubmittingRating && setIsRatingModalOpen(false)} title="ارزیابی کارجو">
-        <form onSubmit={handleSubmitRating} className="space-y-6 pt-2">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-3 text-center">امتیاز شما به این شخص</label>
-            <div className="flex justify-center gap-2 flex-row-reverse">
-              {[5, 4, 3, 2, 1].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setScore(star)}
-                  className="transition-transform hover:scale-110"
-                >
-                  <Star className={`h-10 w-10 ${score >= star ? 'fill-orange-400 text-orange-400' : 'text-slate-200'}`} />
-                </button>
-              ))}
-            </div>
+        <form onSubmit={handleSubmitRating} className="space-y-4 pt-2">
+          <div className="space-y-4">
+            {SEEKER_CRITERIA.map((criterion) => (
+              <div key={criterion.id}>
+                <label className="block text-sm font-bold text-slate-700 mb-2">{criterion.label}</label>
+                <div className="flex gap-1.5 flex-row-reverse">
+                  {[5, 4, 3, 2, 1].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setCriteriaScores(prev => ({ ...prev, [criterion.id]: star }))}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star className={`h-7 w-7 ${(criteriaScores[criterion.id] || 0) >= star ? 'fill-orange-400 text-orange-400' : 'text-slate-200'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div>

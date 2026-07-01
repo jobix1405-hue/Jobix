@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form"; // 👈 SubmitHandler کلا حذف شد تا از روش بهتری استفاده کنیم
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -56,25 +56,37 @@ const jobSchema = z.object({
 
 type JobFormValues = z.infer<typeof jobSchema>;
 
-export default function PostJobPage() {
+function PostJobForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { user } = useStore();
+
+  // 👈 شناسه آگهی در حالت ویرایش (از URL: ?edit=<id>)
+  const editId = searchParams.get("edit");
+  const isEditMode = !!editId;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // استیت‌های دیتابیس
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
   const [allCategories, setAllCategories] = useState<any[]>([]);
+  // 👈 مختصات اولیه برای نمایش پین روی نقشه در حالت ویرایش
+  const [prefillCoords, setPrefillCoords] = useState<[number, number] | undefined>(undefined);
 
-  // 👈 در اینجا تایپ جنریک useForm را برداشتیم تا به صورت اتوماتیک از Zod استنباط کند و گیر ندهد
+  // 👈 جلوگیری از پاک شدن «عنوان شغلی» توسط افکت تغییر «گروه شغلی»
+  // دقیقاً یک‌بار، هنگام پر کردن خودکار فرم در حالت ویرایش
+  const skipCategoryResetRef = useRef(false);
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(jobSchema),
@@ -99,8 +111,12 @@ export default function PostJobPage() {
   const watchCategory = watch("category");
   const watchHasReferralReward = watch("hasReferralReward");
 
-  // با تغییر گروه اصلی، عنوان شغلی ریست می‌شود
+  // با تغییر گروه اصلی، عنوان شغلی ریست می‌شود (به‌جز یک‌بار، هنگام پری‌فیل ویرایش)
   useEffect(() => {
+    if (skipCategoryResetRef.current) {
+      skipCategoryResetRef.current = false;
+      return;
+    }
     setValue("category", "");
     setValue("customCategoryTitle", "");
   }, [watchLevel1, setValue]);
@@ -109,17 +125,73 @@ export default function PostJobPage() {
     const fetchInitialData = async () => {
       if (!user?.id) return;
       try {
-        const { data: catData } = await supabase.from('job_categories').select('id, title, level, parent_id');
+        // ۱. واکشی همزمان دسته‌بندی‌ها + (در صورت ویرایش) خود آگهی
+        const categoriesPromise = supabase
+          .from('job_categories')
+          .select('id, title, level, parent_id');
+
+        const jobPromise = isEditMode
+          ? supabase
+              .from('jobs')
+              .select('*')
+              .eq('id', editId)
+              .eq('employer_id', user.id) // 👈 جلوگیری از ویرایش آگهی دیگران
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null });
+
+        const [{ data: catData }, { data: jobData, error: jobError }] = await Promise.all([
+          categoriesPromise,
+          jobPromise,
+        ]);
+
         if (catData) setAllCategories(catData);
+
+        if (isEditMode) {
+          if (jobError || !jobData) {
+            setLoadError("آگهی مورد نظر یافت نشد یا شما اجازه‌ی ویرایش آن را ندارید.");
+          } else {
+            // ۲. پیدا کردن گروه اصلی (level1) از روی عنوان شغلی ذخیره شده
+            const matchedCategory = (catData || []).find(
+              (c: any) => c.level === 2 && c.title === jobData.category
+            );
+
+            const lat = jobData.lat != null ? Number(jobData.lat) : undefined;
+            const lng = jobData.lng != null ? Number(jobData.lng) : undefined;
+            if (lat != null && lng != null) {
+              setPrefillCoords([lat, lng]);
+            }
+
+            // ۳. جلوگیری از پاک شدن category توسط افکت تغییر level1
+            skipCategoryResetRef.current = true;
+
+            reset({
+              title: jobData.title || "",
+              level1: matchedCategory?.parent_id || "",
+              category: jobData.category || "",
+              customCategoryTitle: "",
+              jobType: jobData.job_type || "",
+              salary: jobData.salary_range || "",
+              location: jobData.location_text || "",
+              description: jobData.description || "",
+              benefits: jobData.benefits || "",
+              coordinates: lat != null && lng != null ? [lat, lng] : [],
+              isUrgent: !!jobData.is_urgent,
+              hasReferralReward: !!(jobData.referral_reward && Number(jobData.referral_reward) > 0),
+              referralReward: jobData.referral_reward ? String(jobData.referral_reward) : "",
+            });
+          }
+        }
       } catch (err) {
         console.error("خطا در دریافت اطلاعات اولیه:", err);
+        if (isEditMode) setLoadError("خطایی در بارگذاری اطلاعات آگهی رخ داد.");
       } finally {
         setIsLoadingInitialData(false);
       }
     };
 
     fetchInitialData();
-  }, [user?.id, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, supabase, isEditMode, editId]);
 
   // استخراج گروه‌های اصلی (لول ۱)
   const level1Options = allCategories
@@ -139,7 +211,6 @@ export default function PostJobPage() {
     return options;
   };
 
-  // 👈 این تابع حالا به عنوان یک تابع معمولی و مستقل عمل می‌کند
   const onSubmit = async (formData: any) => {
     const data = formData as JobFormValues; // تبدیل مطمئن داده‌ها
     
@@ -168,24 +239,39 @@ export default function PostJobPage() {
         if (catError) console.error("خطا در ذخیره شغل جدید:", catError);
       }
 
-      // ثبت نهایی آگهی با فیلدهای جدید
-      const { error: insertError } = await supabase.from('jobs').insert({
-        employer_id: user.id,
+      const payload = {
         title: data.title,
         category: finalJobCategory,
         job_type: data.jobType,
         salary_range: data.salary,
         location_text: data.location,
         description: data.description,
-        benefits: data.benefits || null, // فیلد جدید: مزایا
-        is_urgent: data.isUrgent, // فیلد جدید: نیاز فوری
-        referral_reward: data.hasReferralReward ? Number(data.referralReward) : 0, // فیلد جدید: پاداش معرفی
+        benefits: data.benefits || null,
+        is_urgent: data.isUrgent,
+        referral_reward: data.hasReferralReward ? Number(data.referralReward) : 0,
         lat: data.coordinates?.[0] || null,
         lng: data.coordinates?.[1] || null,
-        status: 'active' 
-      });
+      };
 
-      if (insertError) throw insertError;
+      if (isEditMode) {
+        // 🔥 حالت ویرایش: آپدیت آگهی موجود (وضعیت/status دست‌نخورده می‌ماند)
+        const { error: updateError } = await supabase
+          .from('jobs')
+          .update(payload)
+          .eq('id', editId)
+          .eq('employer_id', user.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // ثبت آگهی جدید
+        const { error: insertError } = await supabase.from('jobs').insert({
+          employer_id: user.id,
+          ...payload,
+          status: 'active',
+        });
+
+        if (insertError) throw insertError;
+      }
 
       setIsSuccess(true);
     } catch (err: any) {
@@ -200,7 +286,9 @@ export default function PostJobPage() {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="text-slate-500 font-medium">در حال آماده‌سازی فرم...</p>
+        <p className="text-slate-500 font-medium">
+          {isEditMode ? "در حال بارگذاری اطلاعات آگهی..." : "در حال آماده‌سازی فرم..."}
+        </p>
       </div>
     );
   }
@@ -208,14 +296,18 @@ export default function PostJobPage() {
   if (isSuccess) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
-        <div className="mb-6 rounded-full bg-green-100 p-4 shadow-sm border border-green-200">
+        <div className="mb-4 rounded-full bg-green-100 p-4 shadow-sm border border-green-200">
           <CheckCircle2 className="h-16 w-16 text-green-600" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900">آگهی شما با موفقیت ثبت شد!</h2>
+        <h2 className="text-2xl font-bold text-slate-900">
+          {isEditMode ? "تغییرات با موفقیت ذخیره شد!" : "آگهی شما با موفقیت ثبت شد!"}
+        </h2>
         <p className="mt-2 text-slate-600 max-w-md leading-relaxed">
-          آگهی شما هم‌اکنون در سیستم به صورت عمومی فعال است و کارجویان می‌توانند آن را مشاهده کنند.
+          {isEditMode
+            ? "اطلاعات آگهی شما به‌روزرسانی شد."
+            : "آگهی شما هم‌اکنون در سیستم به صورت عمومی فعال است و کارجویان می‌توانند آن را مشاهده کنند."}
         </p>
-        <Button className="mt-8 rounded-xl px-8" onClick={() => router.push('/employer/jobs')}>
+        <Button className="mt-6 rounded-xl px-6" onClick={() => router.push('/employer/jobs')}>
           مشاهده آگهی‌های من
         </Button>
       </div>
@@ -223,7 +315,7 @@ export default function PostJobPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl animate-in fade-in duration-500 pb-10">
+    <div className="mx-auto max-w-4xl animate-in fade-in duration-500 pb-6">
       
       {/* دکمه بازگشت اضافه شده */}
       <button 
@@ -234,33 +326,42 @@ export default function PostJobPage() {
         بازگشت
       </button>
 
-      <div className="mb-8 border-b border-slate-200 pb-5 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
+      <div className="mb-6 border-b border-slate-200 pb-5 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
             <Briefcase className="h-6 w-6 text-primary" />
-            ثبت آگهی استخدام جدید
+            {isEditMode ? "ویرایش آگهی استخدام" : "ثبت آگهی استخدام جدید"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             اطلاعات شغل مورد نیاز خود را با دقت وارد کنید تا بهترین کارجویان را پیدا کنید.
           </p>
         </div>
-        <div className="bg-green-50 border border-green-100 px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm">
-          <span className="text-sm font-bold text-green-800">وضعیت سهمیه:</span>
-          <span className="text-sm font-extrabold text-green-700 bg-white px-3 py-0.5 rounded-lg border border-green-200">
-            آزاد و رایگان (نسخه تستی)
-          </span>
-        </div>
+        {!isEditMode && (
+          <div className="bg-green-50 border border-green-100 px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm">
+            <span className="text-sm font-bold text-green-800">وضعیت سهمیه:</span>
+            <span className="text-sm font-extrabold text-green-700 bg-white px-3 py-0.5 rounded-lg border border-green-200">
+              آزاد و رایگان (نسخه تستی)
+            </span>
+          </div>
+        )}
       </div>
 
+      {loadError && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+          <p>{loadError}</p>
+        </div>
+      )}
+
       {errorMessage && (
-        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
           <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
           <p>{errorMessage}</p>
         </div>
       )}
 
       {/* 👈 استفاده از ساختار پیکانی ناشناس (Callback) مشکل تایپ اسکریپت را به طور کامل دور می‌زند */}
-      <form onSubmit={handleSubmit((data) => onSubmit(data))} className="space-y-8 rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-slate-100">
+      <form onSubmit={handleSubmit((data) => onSubmit(data))} className="space-y-6 rounded-3xl bg-white p-4 sm:p-6 shadow-sm border border-slate-100">
         
         {/* عنوان آگهی */}
         <Input
@@ -307,7 +408,7 @@ export default function PostJobPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Select
             label="نوع همکاری *"
             options={[
@@ -340,7 +441,7 @@ export default function PostJobPage() {
         </div>
 
         {/* فیلدهای متنی تفکیک شده */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Textarea
             label="شرح شغل و مهارت‌های مورد نیاز *"
             placeholder="شرح وظایف، انتظارات و مهارت‌های تخصصی را به صورت کامل بنویسید..."
@@ -422,22 +523,35 @@ export default function PostJobPage() {
           </div>
           <MapSelector 
             onLocationSelect={(lat, lng) => setValue("coordinates", [lat, lng])} 
+            defaultLocation={prefillCoords}
           />
           {errors.coordinates && (
             <p className="text-sm text-red-500 mt-2 font-bold">{errors.coordinates.message as string}</p>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-4 border-t border-slate-100 pt-6">
+        <div className="flex items-center justify-end gap-4 border-t border-slate-100 pt-4">
           <Button type="button" variant="ghost" disabled={isSubmitting} onClick={() => router.back()}>
             انصراف
           </Button>
-          <Button type="submit" size="lg" isLoading={isSubmitting} className="rounded-xl px-8 shadow-lg shadow-primary/20">
-            ثبت و انتشار آگهی
+          <Button type="submit" size="lg" isLoading={isSubmitting} className="rounded-xl px-6 shadow-lg shadow-primary/20">
+            {isEditMode ? "ذخیره تغییرات" : "ثبت و انتشار آگهی"}
           </Button>
         </div>
 
       </form>
     </div>
+  );
+}
+
+export default function PostJobPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[60vh] flex-col items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+      </div>
+    }>
+      <PostJobForm />
+    </Suspense>
   );
 }

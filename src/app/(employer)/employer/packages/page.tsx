@@ -90,31 +90,31 @@ function PackagesContent() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl animate-in fade-in duration-500 pb-10">
+    <div className="mx-auto max-w-6xl animate-in fade-in duration-500 pb-6">
       
       {/* پیام خطای بازگشت از درگاه */}
       {paymentStatus === 'failed' && (
-        <div className="mb-8 flex items-center justify-center gap-2 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-600 border border-red-100 animate-in slide-in-from-top-4">
+        <div className="mb-6 flex items-center justify-center gap-2 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-600 border border-red-100 animate-in slide-in-from-top-4">
           <AlertCircle className="h-5 w-5" />
           پرداخت ناموفق بود یا توسط شما لغو شد. لطفاً دوباره تلاش کنید.
         </div>
       )}
 
       {paymentStatus === 'invalid' && (
-        <div className="mb-8 flex items-center justify-center gap-2 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-600 border border-red-100 animate-in slide-in-from-top-4">
+        <div className="mb-6 flex items-center justify-center gap-2 rounded-xl bg-red-50 p-4 text-sm font-bold text-red-600 border border-red-100 animate-in slide-in-from-top-4">
           <AlertCircle className="h-5 w-5" />
           تراکنش نامعتبر است.
         </div>
       )}
 
       {paymentStatus === 'error' && (
-        <div className="mb-8 flex items-center justify-center gap-2 rounded-xl bg-orange-50 p-4 text-sm font-bold text-orange-600 border border-orange-100 animate-in slide-in-from-top-4">
+        <div className="mb-6 flex items-center justify-center gap-2 rounded-xl bg-orange-50 p-4 text-sm font-bold text-orange-600 border border-orange-100 animate-in slide-in-from-top-4">
           <AlertCircle className="h-5 w-5" />
           خطایی در بررسی تراکنش رخ داد. در صورت کسر وجه، مبلغ تا ۷۲ ساعت آینده به حساب شما بازمی‌گردد.
         </div>
       )}
 
-      <div className="text-center mb-12">
+      <div className="text-center mb-8">
         <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">
           تعرفه‌های ثبت آگهی استخدام
         </h1>
@@ -124,14 +124,14 @@ function PackagesContent() {
       </div>
 
       {/* نمایش پکیج‌ها */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 items-center">
         {packages.map((pkg, index) => {
           const isPopular = index === 1;
 
           return (
             <div 
               key={pkg.id} 
-              className={`relative flex flex-col rounded-3xl bg-white p-8 transition-all duration-300 ${
+              className={`relative flex flex-col rounded-3xl bg-white p-6 transition-all duration-300 ${
                 isPopular 
                   ? "border-2 border-primary shadow-xl shadow-primary/10 scale-100 md:scale-105 z-10" 
                   : "border border-slate-200 shadow-sm hover:border-primary/50 hover:shadow-md"
@@ -143,7 +143,7 @@ function PackagesContent() {
                 </div>
               )}
 
-              <div className="mb-6">
+              <div className="mb-4">
                 <h3 className={`text-xl font-bold ${isPopular ? "text-primary" : "text-slate-900"}`}>
                   {pkg.name}
                 </h3>
@@ -152,14 +152,14 @@ function PackagesContent() {
                 </p>
               </div>
 
-              <div className="mb-8 flex items-baseline text-slate-900">
+              <div className="mb-6 flex items-baseline text-slate-900">
                 <span className="text-4xl font-extrabold tracking-tight">
                   {(pkg.price / 10).toLocaleString('fa-IR')}
                 </span>
                 <span className="ml-1 text-sm font-semibold text-slate-500">تومان</span>
               </div>
 
-              <ul className="mb-8 flex-1 space-y-4 text-sm text-slate-600">
+              <ul className="mb-6 flex-1 space-y-4 text-sm text-slate-600">
                 <li className="flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                   امکان ثبت <strong className="text-slate-900">{pkg.job_count} آگهی</strong> شغلی
@@ -190,7 +190,7 @@ function PackagesContent() {
         })}
       </div>
 
-      <div className="mt-16 flex items-start gap-4 rounded-2xl bg-slate-50 p-6 border border-slate-100">
+      <div className="mt-10 flex items-start gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100">
         <ShieldCheck className="h-8 w-8 text-green-600 shrink-0" />
         <div>
           <h4 className="font-bold text-slate-900">پرداخت امن و تضمین شده</h4>
@@ -207,7 +207,7 @@ function PackagesContent() {
         title="تایید و انتقال به درگاه"
       >
         {selectedPackage && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 p-4 border border-slate-100">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-slate-600 text-sm">بسته انتخابی:</span>

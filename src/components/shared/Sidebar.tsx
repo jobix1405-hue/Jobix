@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useStore } from "@/store/useStore";
 import { createClient } from "@/lib/supabase";
 import { 
@@ -10,7 +11,6 @@ import {
   Users, 
   MessageSquare, 
   Settings, 
-  LogOut, 
   X,
   Bookmark, 
   ShieldCheck, 
@@ -19,7 +19,8 @@ import {
   Package,
   AlertTriangle,
   GraduationCap,
-  Megaphone 
+  Megaphone,
+  BookOpen 
 } from "lucide-react";
 
 interface SidebarItem {
@@ -34,17 +35,46 @@ interface SidebarProps {
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const supabase = createClient();
-  const { isSidebarOpen, toggleSidebar, setUser } = useStore();
+  const { isSidebarOpen, toggleSidebar, user } = useStore();
 
-  // تابع خروج از حساب کاربری
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    router.push("/login");
-    router.refresh();
-  };
+  // 👈 تعداد درخواست‌های چت در انتظار پاسخ (برای بج روی آیکون «پیام‌ها»)
+  const [pendingChatCount, setPendingChatCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id || role === "admin") return;
+
+    const fetchPendingChats = async () => {
+      let query = supabase.from('conversations').select('id', { count: 'exact', head: true });
+
+      if (role === "employer") {
+        query = query.eq('employer_id', user.id).eq('status', 'pending_employer').eq('is_deleted_by_employer', false);
+      } else {
+        query = query.eq('job_seeker_id', user.id).eq('status', 'pending_seeker').eq('is_deleted_by_seeker', false);
+      }
+
+      const { count } = await query;
+      setPendingChatCount(count || 0);
+    };
+
+    fetchPendingChats();
+
+    // اتصال زنده: با هر تغییر در گفتگوهای مرتبط با این کاربر، شمارش دوباره انجام می‌شود
+    const filterColumn = role === "employer" ? "employer_id" : "job_seeker_id";
+    const channel = supabase
+      .channel(`sidebar_chat_requests_${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'conversations',
+        filter: `${filterColumn}=eq.${user.id}`
+      }, () => {
+        fetchPendingChats();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, role, supabase]);
 
   // تنظیم لینک‌های اختصاصی بر اساس هر سه نقش
   let links: SidebarItem[] = [];
@@ -59,7 +89,8 @@ export function Sidebar({ role }: SidebarProps) {
       { name: "مدیریت تعرفه‌ها", href: "/admin/packages", icon: Package },
       { name: "گزارشات مالی", href: "/admin/transactions", icon: CreditCard },
       { name: "گزارشات تخلف", href: "/admin/reports", icon: AlertTriangle },
-      { name: "درخواست‌های آکادمی", href: "/admin/course-requests", icon: GraduationCap }, // 👈 این لینک با موفقیت اضافه شد
+      { name: "تعریف آکادمی", href: "/admin/academy", icon: BookOpen }, // 👈 اضافه شد: تعریف دوره‌ها و اتصال به عناوین شغلی
+      { name: "درخواست‌های آکادمی", href: "/admin/course-requests", icon: GraduationCap },
       { name: "اطلاع‌رسانی سراسری", href: "/admin/announcements", icon: Megaphone },
     ];
   } else if (role === "employer") {
@@ -112,6 +143,8 @@ export function Sidebar({ role }: SidebarProps) {
         <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
           {links.map((link) => {
             const isActive = pathname === link.href || (pathname.startsWith(link.href + '/') && link.href !== '/admin' && link.href !== '/employer' && link.href !== '/job-seeker');
+            const isMessagesLink = link.href === '/employer/messages' || link.href === '/job-seeker/messages';
+            const showChatBadge = isMessagesLink && pendingChatCount > 0;
             
             return (
               <Link
@@ -126,23 +159,21 @@ export function Sidebar({ role }: SidebarProps) {
                   if (window.innerWidth < 1024) toggleSidebar();
                 }}
               >
-                <link.icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-slate-400"}`} />
+                <span className="relative flex items-center justify-center">
+                  <link.icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-slate-400"} ${showChatBadge ? "animate-bell-ring text-secondary" : ""}`} />
+                  {showChatBadge && (
+                    <span className="absolute -right-2 -top-2 flex min-w-[16px] h-[16px] items-center justify-center rounded-full bg-secondary px-1 text-[9px] font-bold text-white ring-2 ring-white shadow-md">
+                      {pendingChatCount > 9 ? "+9" : pendingChatCount}
+                    </span>
+                  )}
+                </span>
                 {link.name}
               </Link>
             );
           })}
         </nav>
 
-        {/* بخش خروج */}
-        <div className="p-4 border-t border-slate-100">
-          <button 
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-          >
-            <LogOut className="h-5 w-5" />
-            خروج از حساب
-          </button>
-        </div>
+        {/* 👈 بخش خروج حذف شد: دکمه «خروج از حساب» طبق چک‌لیست فاز دوم به دراپ‌داون کاربر در DashboardHeader منتقل شد */}
       </aside>
     </>
   );

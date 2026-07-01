@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Send, Building2, User, CheckCheck, Loader2, MessageSquare, Check } from "lucide-react";
+import {
+  Send, Building2, User, CheckCheck, Loader2, MessageSquare,
+  Check, BellRing, Trash2, ShieldAlert, CheckCircle2, AlertCircle
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
@@ -13,6 +17,9 @@ interface Conversation {
   employer: { company_name: string; logo_url: string };
   job: { title: string };
   updated_at: string;
+  status: string;
+  requested_by: string;
+  is_deleted_by_seeker: boolean;
   unread_count?: number;
 }
 
@@ -34,49 +41,58 @@ export default function JobSeekerMessagesPage() {
   const [newMessage, setNewMessage] = useState("");
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  
+
+  // تب‌های بخش پیام‌ها (هماهنگ با پنل کارفرما)
+  const [activeTab, setActiveTab] = useState<"chats" | "requests">("chats");
+
   const [isOtherTyping, setIsOtherTyping] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]); // 🔥 استیت برای کاربران آنلاین
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+
+  // استیت‌های مودال حذف چت
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingChat, setIsDeletingChat] = useState(false);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ۱. واکشی لیست گفتگوها
+  const fetchConversations = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          id, employer_id, job_id, updated_at, status, requested_by, is_deleted_by_seeker,
+          employer:profiles!conversations_employer_id_fkey(company_name, logo_url),
+          job:jobs(title),
+          messages (id, is_read, sender_id)
+        `)
+        .eq('job_seeker_id', user.id)
+        .eq('is_deleted_by_seeker', false)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formatted = data?.map((conv: any) => {
+        const unread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id !== user.id).length || 0;
+        return {
+          ...conv,
+          employer: Array.isArray(conv.employer) ? conv.employer[0] : conv.employer,
+          job: Array.isArray(conv.job) ? conv.job[0] : conv.job,
+          unread_count: unread
+        };
+      }) || [];
+
+      setConversations(formatted);
+    } catch (err) {
+      console.error("Error fetching conversations:", err);
+    } finally {
+      setIsLoadingChats(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchConversations = async () => {
-      if (!user?.id) return;
-      try {
-        const { data, error } = await supabase
-          .from('conversations')
-          .select(`
-            id, employer_id, job_id, updated_at,
-            employer:profiles!conversations_employer_id_fkey(company_name, logo_url),
-            job:jobs(title),
-            messages (id, is_read, sender_id)
-          `)
-          .eq('job_seeker_id', user.id)
-          .order('updated_at', { ascending: false });
-
-        if (error) throw error;
-
-        const formatted = data?.map((conv: any) => {
-          const unread = conv.messages?.filter((m: any) => !m.is_read && m.sender_id !== user.id).length || 0;
-          return {
-            ...conv,
-            employer: Array.isArray(conv.employer) ? conv.employer[0] : conv.employer,
-            job: Array.isArray(conv.job) ? conv.job[0] : conv.job,
-            unread_count: unread
-          };
-        }) || [];
-
-        setConversations(formatted);
-      } catch (err) {
-        console.error("Error fetching conversations:", err);
-      } finally {
-        setIsLoadingChats(false);
-      }
-    };
     fetchConversations();
   }, [user?.id, supabase]);
 
@@ -103,7 +119,7 @@ export default function JobSeekerMessagesPage() {
     };
   }, [user?.id, supabase]);
 
-  // ۳. مدیریت پیام‌ها
+  // ۳. مدیریت پیام‌های چت فعال
   useEffect(() => {
     if (!activeChat || !user?.id) return;
 
@@ -115,14 +131,16 @@ export default function JobSeekerMessagesPage() {
         .order('created_at', { ascending: true });
       if (data) setMessages(data);
 
-      await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('conversation_id', activeChat.id)
-        .neq('sender_id', user.id)
-        .eq('is_read', false);
-        
-      setConversations(prev => prev.map(c => c.id === activeChat.id ? { ...c, unread_count: 0 } : c));
+      if (activeChat.status === 'active') {
+        await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .eq('conversation_id', activeChat.id)
+          .neq('sender_id', user.id)
+          .eq('is_read', false);
+
+        setConversations(prev => prev.map(c => c.id === activeChat.id ? { ...c, unread_count: 0 } : c));
+      }
     };
 
     fetchMessages();
@@ -136,8 +154,8 @@ export default function JobSeekerMessagesPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeChat.id}` }, (payload) => {
         const newMsg = payload.new as Message;
         setMessages((prev) => [...prev, newMsg]);
-        
-        if (newMsg.sender_id !== user.id) {
+
+        if (newMsg.sender_id !== user.id && activeChat.status === 'active') {
           supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id).then();
         }
       })
@@ -164,11 +182,11 @@ export default function JobSeekerMessagesPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user?.id || !activeChat) return;
+    if (!newMessage.trim() || !user?.id || !activeChat || activeChat.status !== 'active') return;
 
     setIsSending(true);
     const text = newMessage;
-    setNewMessage(""); 
+    setNewMessage("");
 
     try {
       const { error } = await supabase
@@ -180,9 +198,9 @@ export default function JobSeekerMessagesPage() {
         });
 
       if (error) throw error;
-      
+
       await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', activeChat.id);
-      
+
       setConversations(prev => {
         const chat = prev.find(c => c.id === activeChat.id);
         const others = prev.filter(c => c.id !== activeChat.id);
@@ -191,7 +209,7 @@ export default function JobSeekerMessagesPage() {
       });
     } catch (err) {
       console.error("Error sending message:", err);
-      setNewMessage(text); 
+      setNewMessage(text);
     } finally {
       setIsSending(false);
     }
@@ -199,7 +217,7 @@ export default function JobSeekerMessagesPage() {
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
-    if (channelRef.current && user?.id) {
+    if (channelRef.current && user?.id && activeChat?.status === 'active') {
       channelRef.current.send({
         type: 'broadcast',
         event: 'typing',
@@ -208,28 +226,91 @@ export default function JobSeekerMessagesPage() {
     }
   };
 
+  // پذیرش درخواست چتی که کارفرما ارسال کرده (status: pending_seeker -> active)
+  const handleAcceptRequest = async () => {
+    if (!activeChat) return;
+    try {
+      await supabase.from('conversations').update({ status: 'active' }).eq('id', activeChat.id);
+      setActiveChat({ ...activeChat, status: 'active' });
+      fetchConversations();
+    } catch (err) {
+      alert("خطا در پذیرش چت");
+    }
+  };
+
+  // باز کردن مودال حذف/رد چت
+  const confirmDeleteChat = () => {
+    setIsDeleteModalOpen(true);
+  };
+
+  // اجرای عملیات حذف/قطع ارتباط (هم برای رد درخواست و هم حذف چت فعال)
+  const executeDeleteChat = async () => {
+    if (!activeChat) return;
+    setIsDeletingChat(true);
+    try {
+      await supabase.from('conversations').update({ is_deleted_by_seeker: true }).eq('id', activeChat.id);
+      setActiveChat(null);
+      fetchConversations();
+      setIsDeleteModalOpen(false);
+    } catch (err) {
+      alert("خطا در حذف چت");
+    } finally {
+      setIsDeletingChat(false);
+    }
+  };
+
   const formatTime = (isoString: string) => {
     return new Date(isoString).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // درخواست‌های در انتظار پاسخ کارجو (کارفرما درخواست داده)
+  const pendingRequests = conversations.filter(c => c.status === 'pending_seeker');
+  // گفتگوهای فعال یا درخواست‌هایی که خود کارجو فرستاده و منتظر تایید کارفرماست
+  const activeChats = conversations.filter(c => c.status === 'active' || c.status === 'pending_employer');
+  const displayList = activeTab === "requests" ? pendingRequests : activeChats;
+
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4 animate-in fade-in duration-500">
-      
+
       {/* لیست گفتگوها (سایدبار راست) */}
       <div className={`w-full lg:w-1/3 flex flex-col rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm ${activeChat ? 'hidden lg:flex' : 'flex'}`}>
-        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
             <MessageSquare className="h-5 w-5 text-primary" />
             پیام‌ها و گفتگوها
           </h2>
+
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab("chats")}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                activeTab === "chats" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              پیام‌های من
+            </button>
+            <button
+              onClick={() => setActiveTab("requests")}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === "requests" ? "bg-white text-orange-600 shadow-sm" : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              درخواست‌ها
+              {pendingRequests.length > 0 && (
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {isLoadingChats ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : conversations.length > 0 ? (
-            conversations.map((conv) => {
-              // بررسی آنلاین بودن کارفرما
+          ) : displayList.length > 0 ? (
+            displayList.map((conv) => {
               const isEmployerOnline = onlineUsers.includes(conv.employer_id);
 
               return (
@@ -242,7 +323,6 @@ export default function JobSeekerMessagesPage() {
                 >
                   <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-primary font-bold overflow-hidden border border-slate-200">
                     {conv.employer.logo_url ? <img src={conv.employer.logo_url} className="w-full h-full object-cover" alt="logo" /> : <Building2 className="h-6 w-6" />}
-                    {/* 🔥 نقطه سبز نشانگر آنلاین بودن */}
                     {isEmployerOnline && (
                       <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white"></span>
                     )}
@@ -250,7 +330,7 @@ export default function JobSeekerMessagesPage() {
                   <div className="flex-1 overflow-hidden">
                     <div className="flex justify-between items-center">
                       <h4 className="font-bold text-slate-900 truncate">{conv.employer.company_name || 'شرکت نامشخص'}</h4>
-                      {(conv.unread_count || 0) > 0 && (
+                      {(conv.unread_count || 0) > 0 && activeTab === "chats" && (
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-white shrink-0">
                           {conv.unread_count}
                         </span>
@@ -262,9 +342,18 @@ export default function JobSeekerMessagesPage() {
               );
             })
           ) : (
-            <div className="text-center py-10 text-slate-400 text-sm">
-              <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              هنوز گفتگویی ندارید.
+            <div className="text-center py-10 text-slate-400 text-sm px-4">
+              {activeTab === "requests" ? (
+                <>
+                  <BellRing className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  هیچ درخواست چت جدیدی ندارید.
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  هنوز گفتگوی فعالی ندارید.
+                </>
+              )}
             </div>
           )}
         </div>
@@ -274,34 +363,67 @@ export default function JobSeekerMessagesPage() {
       <div className={`w-full lg:w-2/3 flex flex-col rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm ${!activeChat ? 'hidden lg:flex' : 'flex'}`}>
         {activeChat ? (
           <>
-            {/* هدر چت */}
-            <div className="flex items-center gap-4 p-4 border-b border-slate-100 bg-slate-50/50 relative z-10 shadow-sm">
-              <button onClick={() => setActiveChat(null)} className="lg:hidden text-slate-500 p-2">
-                بازگشت
-              </button>
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-primary font-bold overflow-hidden border border-slate-200">
-                {activeChat.employer.logo_url ? <img src={activeChat.employer.logo_url} className="w-full h-full object-cover" alt="logo" /> : <Building2 className="h-6 w-6" />}
-                {/* 🔥 نقطه سبز هدر */}
-                {onlineUsers.includes(activeChat.employer_id) && (
-                  <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white"></span>
-                )}
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">{activeChat.employer.company_name || 'شرکت نامشخص'}</h3>
-                <p className="text-xs mt-0.5 font-medium flex items-center gap-1">
-                  {onlineUsers.includes(activeChat.employer_id) ? (
-                    <span className="text-green-600">آنلاین</span>
-                  ) : (
-                    <span className="text-slate-400">آفلاین</span>
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50 relative z-10 shadow-sm">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setActiveChat(null)} className="lg:hidden text-slate-500 p-2">بازگشت</button>
+                <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-primary font-bold overflow-hidden border border-slate-200">
+                  {activeChat.employer.logo_url ? <img src={activeChat.employer.logo_url} className="w-full h-full object-cover" alt="logo" /> : <Building2 className="h-6 w-6" />}
+                  {onlineUsers.includes(activeChat.employer_id) && (
+                    <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white"></span>
                   )}
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-500">مرتبط با آگهی: {activeChat.job?.title}</span>
-                </p>
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">{activeChat.employer.company_name || 'شرکت نامشخص'}</h3>
+                  <p className="text-xs mt-0.5 font-medium flex items-center gap-1">
+                    {onlineUsers.includes(activeChat.employer_id) ? (
+                      <span className="text-green-600">آنلاین</span>
+                    ) : (
+                      <span className="text-slate-400">آفلاین</span>
+                    )}
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-500">مرتبط با آگهی: {activeChat.job?.title}</span>
+                  </p>
+                </div>
               </div>
+
+              {/* دکمه حذف و قطع ارتباط */}
+              <button
+                onClick={confirmDeleteChat}
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-colors border border-red-100"
+                title="حذف و قطع ارتباط"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
             </div>
 
-            {/* لیست پیام‌ها */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+
+              {activeChat.status === 'pending_seeker' && (
+                <div className="flex flex-col items-center justify-center py-10 my-10 bg-white border border-slate-200 rounded-3xl shadow-sm text-center p-6 mx-4">
+                  <div className="h-16 w-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mb-4">
+                    <ShieldAlert className="h-8 w-8" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">درخواست شروع چت</h3>
+                  <p className="text-sm text-slate-500 mb-6 max-w-sm">
+                    این کارفرما برای ارتباط با شما درخواست داده است. برای مشاهده پیام‌ها و پاسخگویی باید درخواست را بپذیرید.
+                  </p>
+                  <div className="flex gap-4 w-full sm:w-auto">
+                    <Button variant="outline" className="w-full sm:w-32 border-red-200 text-red-500 hover:bg-red-50" onClick={confirmDeleteChat}>
+                      رد درخواست
+                    </Button>
+                    <Button className="w-full sm:w-40 bg-green-600 hover:bg-green-700 border-0" onClick={handleAcceptRequest}>
+                      <CheckCircle2 className="h-4 w-4 ml-2" /> پذیرش چت
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {activeChat.status === 'pending_employer' && (
+                <div className="text-center py-4 bg-blue-50 text-blue-700 text-xs font-bold rounded-xl border border-blue-100 mb-4 mx-4">
+                  شما درخواست چت ارسال کرده‌اید. منتظر تایید از سمت کارفرما بمانید...
+                </div>
+              )}
+
               {messages.map((msg) => {
                 const isMe = msg.sender_id === user?.id;
                 return (
@@ -321,7 +443,7 @@ export default function JobSeekerMessagesPage() {
                 );
               })}
 
-              {isOtherTyping && (
+              {isOtherTyping && activeChat.status === 'active' && (
                 <div className="flex justify-start animate-in fade-in">
                   <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm p-3 px-4 flex items-center gap-1 shadow-sm">
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
@@ -334,20 +456,25 @@ export default function JobSeekerMessagesPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* فرم ارسال */}
             <div className="p-4 bg-white border-t border-slate-100">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={handleTyping}
-                  placeholder="پیام خود را بنویسید..."
-                  className="flex-1 h-12 rounded-xl bg-slate-100 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <Button type="submit" disabled={!newMessage.trim() || isSending} className="h-12 w-12 rounded-xl shrink-0 p-0 flex items-center justify-center shadow-md">
-                  {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 rotate-180" />}
-                </Button>
-              </form>
+              {activeChat.status === 'active' ? (
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={handleTyping}
+                    placeholder="پیام خود را بنویسید..."
+                    className="flex-1 h-12 rounded-xl bg-slate-100 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <Button type="submit" disabled={!newMessage.trim() || isSending} className="h-12 w-12 rounded-xl shrink-0 p-0 flex items-center justify-center shadow-md">
+                    {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 rotate-180" />}
+                  </Button>
+                </form>
+              ) : (
+                <div className="h-12 rounded-xl bg-slate-50 flex items-center justify-center text-xs text-slate-400 font-bold border border-slate-100">
+                  {activeChat.status === 'pending_seeker' ? "ابتدا باید درخواست چت را بپذیرید" : "امکان ارسال پیام تا زمان تایید کارفرما وجود ندارد"}
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -359,6 +486,41 @@ export default function JobSeekerMessagesPage() {
           </div>
         )}
       </div>
+
+      {/* مودال حذف/رد چت */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => !isDeletingChat && setIsDeleteModalOpen(false)}
+        title="قطع ارتباط و حذف چت"
+      >
+        <div className="flex flex-col items-center text-center pb-4 pt-2">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+            <AlertCircle className="h-7 w-7 text-red-600" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">آیا از حذف این چت مطمئن هستید؟</h3>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            با این کار ارتباط شما با این کارفرما قطع شده و صفحه چت مخفی می‌شود. در صورت نیاز به ارتباط مجدد، باید دوباره درخواست ارسال کنید.
+          </p>
+          <div className="mt-8 flex w-full gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={() => setIsDeleteModalOpen(false)}
+              disabled={isDeletingChat}
+            >
+              انصراف
+            </Button>
+            <Button
+              className="flex-1 h-12 bg-red-600 hover:bg-red-700 border-none"
+              onClick={executeDeleteChat}
+              isLoading={isDeletingChat}
+            >
+              بله، چت حذف شود
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }

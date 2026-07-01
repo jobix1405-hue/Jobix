@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   GripVertical, 
-  User, 
   Clock, 
   CheckCircle2, 
   XCircle, 
@@ -15,7 +14,9 @@ import {
   MessageSquare,
   Search,
   ChevronLeft,
-  ChevronDown
+  ChevronDown,
+  Tag,
+  Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
@@ -49,7 +50,24 @@ interface ApplicationData {
   status: ApplicationStatus;
   jobSeekerId: string;
   jobId: string; 
+  avatarUrl: string;
+  aboutMe: string;
+  skills: string;
 }
+
+// 👈 تایپ ساده برای لیست آگهی‌های کارفرما (برای فیلتر)
+interface EmployerJobOption {
+  id: string;
+  title: string;
+}
+
+// از روی نام و نام‌خانوادگی، حروف اول برای آواتار جایگزین می‌سازد
+const getInitials = (name: string) => {
+  const parts = name.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "؟";
+  if (parts.length === 1) return parts[0].charAt(0);
+  return parts[0].charAt(0) + parts[1].charAt(0);
+};
 
 const COLUMNS = [
   { id: "pending", title: "دریافت شده", icon: Clock, color: "border-orange-200 bg-orange-50 text-orange-700" },
@@ -59,6 +77,7 @@ const COLUMNS = [
 ];
 
 const PAGE_SIZE = 50; // تعداد رزومه‌هایی که در هر مرحله لود می‌شوند
+const JOB_FILTER_ALL = "all"; // 👈 مقدار ثابت برای گزینه «همه آگهی‌ها» در فیلتر
 
 // ==========================================
 // 1. کامپوننت کارت رزومه
@@ -73,55 +92,88 @@ const ApplicationCard = ({
   handleStartChat?: (app: ApplicationData) => void, 
   isStartingChat?: string | null,
   isOverlay?: boolean
-}) => (
-  <div className={`group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all ${isOverlay ? 'shadow-2xl ring-2 ring-primary/50 rotate-2 cursor-grabbing' : 'hover:border-primary/30 hover:shadow-md cursor-grab'}`}>
-    <div className="absolute left-3 top-4 text-slate-300 group-hover:text-slate-400">
-      <GripVertical className="h-5 w-5" />
-    </div>
+}) => {
+  const skillTags = app.skills ? app.skills.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const visibleSkills = skillTags.slice(0, 3);
+  const extraSkillsCount = skillTags.length - visibleSkills.length;
 
-    <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-        <User className="h-5 w-5" />
+  return (
+    <div className={`group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all ${isOverlay ? 'shadow-2xl ring-2 ring-primary/50 rotate-2 cursor-grabbing' : 'hover:border-primary/30 hover:shadow-md cursor-grab'}`}>
+      <div className="absolute left-3 top-4 text-slate-300 group-hover:text-slate-400">
+        <GripVertical className="h-5 w-5" />
       </div>
-      <div className="pl-6">
-        <h4 className="font-bold text-slate-900 line-clamp-1">{app.applicantName}</h4>
-        <p className="text-xs font-medium text-slate-500 mt-0.5 line-clamp-1">{app.jobTitle}</p>
-      </div>
-    </div>
 
-    <div className="mt-2 flex items-center justify-between border-t border-slate-50 pt-3 text-xs">
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <Clock className="h-3.5 w-3.5" />
-        {app.date}
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary/15 to-primary/5 text-sm font-bold text-primary ring-1 ring-primary/10">
+          {app.avatarUrl ? (
+            <img src={app.avatarUrl} alt={app.applicantName} className="h-full w-full object-cover" />
+          ) : (
+            getInitials(app.applicantName)
+          )}
+        </div>
+        <div className="pl-6">
+          <h4 className="font-bold text-slate-900 line-clamp-1">{app.applicantName}</h4>
+          <p className="text-xs font-medium text-slate-500 mt-0.5 line-clamp-1">{app.jobTitle}</p>
+        </div>
       </div>
-      <div className={`flex items-center gap-1 rounded-md px-2 py-1 font-bold ${
-        app.matchScore >= 75 ? "bg-green-100 text-green-700" :
-        app.matchScore >= 50 ? "bg-blue-100 text-blue-700" :
-        "bg-orange-100 text-orange-700"
-      }`}>
-        تطابق: {app.matchScore}٪
-      </div>
-    </div>
 
-    <div className="mt-2 flex items-center gap-2">
-      <Link href={`/employer/applicant/${app.jobSeekerId}`} className="flex-1">
-        <Button variant="outline" size="sm" className="w-full h-8 text-xs bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700">
-          مشاهده
+      {/* خلاصه رزومه */}
+      {app.aboutMe && (
+        <p className="text-xs leading-relaxed text-slate-500 line-clamp-2">
+          {app.aboutMe}
+        </p>
+      )}
+
+      {/* تگ مهارت‌ها */}
+      {visibleSkills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {visibleSkills.map((skill, idx) => (
+            <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+              <Tag className="h-3 w-3 text-slate-400" /> {skill}
+            </span>
+          ))}
+          {extraSkillsCount > 0 && (
+            <span className="rounded-md bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-400">
+              +{extraSkillsCount}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="mt-1 flex items-center justify-between border-t border-slate-50 pt-3 text-xs">
+        <div className="flex items-center gap-1.5 text-slate-400">
+          <Clock className="h-3.5 w-3.5" />
+          {app.date}
+        </div>
+        <div className={`flex items-center gap-1 rounded-md px-2 py-1 font-bold ${
+          app.matchScore >= 75 ? "bg-green-100 text-green-700" :
+          app.matchScore >= 50 ? "bg-blue-100 text-blue-700" :
+          "bg-orange-100 text-orange-700"
+        }`}>
+          تطابق: {app.matchScore}٪
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <Link href={`/employer/applications/${app.jobSeekerId}`} className="flex-1">
+          <Button variant="outline" size="sm" className="w-full h-8 text-xs bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700">
+            مشاهده
+          </Button>
+        </Link>
+        <Button 
+          variant="primary" 
+          size="sm" 
+          className="flex-1 h-8 text-xs bg-primary/10 text-primary hover:bg-primary hover:text-white border-0 flex items-center justify-center gap-1.5"
+          onClick={() => handleStartChat && handleStartChat(app)}
+          isLoading={isStartingChat === app.id}
+        >
+          {!isStartingChat && <MessageSquare className="h-3.5 w-3.5" />}
+          پیام
         </Button>
-      </Link>
-      <Button 
-        variant="primary" 
-        size="sm" 
-        className="flex-1 h-8 text-xs bg-primary/10 text-primary hover:bg-primary hover:text-white border-0 flex items-center justify-center gap-1.5"
-        onClick={() => handleStartChat && handleStartChat(app)}
-        isLoading={isStartingChat === app.id}
-      >
-        {!isStartingChat && <MessageSquare className="h-3.5 w-3.5" />}
-        پیام
-      </Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ==========================================
 // 2. کامپوننت قابل درگ شدن
@@ -201,6 +253,10 @@ export default function EmployerApplicationsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  // 👈 استیت‌های مربوط به فیلتر بر اساس آگهی
+  const [employerJobs, setEmployerJobs] = useState<EmployerJobOption[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<string>(JOB_FILTER_ALL);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -227,7 +283,7 @@ export default function EmployerApplicationsPage() {
         .select(`
           id, status, created_at, job_seeker_id,
           jobs!inner (id, title, description, employer_id),
-          profiles!applications_job_seeker_id_fkey (first_name, last_name, phone_number, job_title, skills)
+          profiles!applications_job_seeker_id_fkey (first_name, last_name, phone_number, job_title, skills, avatar_url, about_me)
         `, { count: 'exact' })
         .eq('jobs.employer_id', user.id)
         .order('created_at', { ascending: false })
@@ -251,7 +307,10 @@ export default function EmployerApplicationsPage() {
             matchScore: realMatchScore,
             status: app.status as ApplicationStatus,
             jobSeekerId: app.job_seeker_id,
-            jobId: app.jobs?.id
+            jobId: app.jobs?.id,
+            avatarUrl: app.profiles?.avatar_url || "",
+            aboutMe: app.profiles?.about_me || "",
+            skills: app.profiles?.skills || ""
           };
         });
 
@@ -279,9 +338,29 @@ export default function EmployerApplicationsPage() {
     }
   };
 
+  // 👈 واکشی مستقل لیست کامل آگهی‌های کارفرما (برای پر کردن فیلتر)
+  // این واکشی جدا از رزومه‌هاست تا حتی آگهی‌های بدون رزومه هم در فیلتر دیده شوند
+  const fetchEmployerJobs = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error: jobsError } = await supabase
+        .from('jobs')
+        .select('id, title')
+        .eq('employer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (jobsError) throw jobsError;
+      setEmployerJobs(data || []);
+    } catch (err) {
+      console.error("خطا در دریافت لیست آگهی‌ها برای فیلتر:", err);
+    }
+  };
+
   // واکشی اولیه در زمان لود کامپوننت
   useEffect(() => {
     fetchApplications(0, false);
+    fetchEmployerJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, supabase]);
 
   // هندلر دکمه بارگذاری بیشتر
@@ -360,7 +439,7 @@ export default function EmployerApplicationsPage() {
     try {
       const { data: existingConv, error: checkError } = await supabase
         .from('conversations')
-        .select('id, is_deleted_by_employer')
+        .select('id, is_deleted_by_employer, is_deleted_by_seeker')
         .eq('employer_id', user.id)
         .eq('job_seeker_id', app.jobSeekerId)
         .eq('job_id', app.jobId)
@@ -369,11 +448,13 @@ export default function EmployerApplicationsPage() {
       if (checkError) throw checkError;
 
       if (existingConv) {
-        if (existingConv.is_deleted_by_employer) {
+        // اگر خود کارفرما قبلاً حذفش کرده بود یا کارجو رد/حذفش کرده بود، دوباره فعالش می‌کنیم
+        if (existingConv.is_deleted_by_employer || existingConv.is_deleted_by_seeker) {
           await supabase
             .from('conversations')
             .update({ 
               is_deleted_by_employer: false, 
+              is_deleted_by_seeker: false,
               status: 'pending_seeker', 
               requested_by: 'employer' 
             })
@@ -404,10 +485,22 @@ export default function EmployerApplicationsPage() {
     }
   };
 
-  const filteredApplications = applications.filter(app => 
-    app.applicantName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    app.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 👈 گزینه‌های فیلتر آگهی: «همه آگهی‌ها» + لیست آگهی‌های کارفرما
+  const jobFilterOptions = [
+    { value: JOB_FILTER_ALL, label: "همه آگهی‌ها" },
+    ...employerJobs.map((job) => ({ value: job.id, label: job.title })),
+  ];
+
+  const filteredApplications = applications.filter(app => {
+    const matchesSearch = 
+      app.applicantName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      app.jobTitle.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 👈 فیلتر بر اساس آگهی انتخاب شده (اگر «همه آگهی‌ها» نبود)
+    const matchesJob = selectedJobId === JOB_FILTER_ALL || app.jobId === selectedJobId;
+
+    return matchesSearch && matchesJob;
+  });
 
   if (isLoading) {
     return (
@@ -419,7 +512,7 @@ export default function EmployerApplicationsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col animate-in fade-in duration-500 pb-10">
+    <div className="flex h-full flex-col animate-in fade-in duration-500 pb-6">
       
       <button 
         onClick={() => router.back()} 
@@ -428,7 +521,7 @@ export default function EmployerApplicationsPage() {
         <ChevronLeft className="h-4 w-4" /> بازگشت
       </button>
 
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="mb-4 flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">مدیریت رزومه‌ها (ATS)</h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -436,23 +529,47 @@ export default function EmployerApplicationsPage() {
           </p>
         </div>
         
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="جستجوی نام کارجو یا عنوان آگهی..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full h-10 pl-3 pr-9 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" 
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+          {/* 👈 فیلتر بر اساس آگهی شغلی */}
+          <div className="relative w-full sm:w-64">
+            <Briefcase className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <select
+              value={selectedJobId}
+              onChange={(e) => setSelectedJobId(e.target.value)}
+              className="w-full h-10 pl-8 pr-9 bg-white border border-slate-200 rounded-xl text-sm appearance-none focus:outline-none shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all cursor-pointer"
+            >
+              {jobFilterOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="جستجوی نام کارجو یا عنوان آگهی..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="w-full h-10 pl-3 pr-9 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none shadow-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all" 
+            />
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
           <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
           <p>{error}</p>
         </div>
+      )}
+
+      {/* پیام راهنما وقتی فیلتر آگهی فعال است */}
+      {selectedJobId !== JOB_FILTER_ALL && (
+        <p className="mb-4 text-xs text-slate-400">
+          * فیلتر آگهی روی رزومه‌های لود شده اعمال می‌شود. اگر رزومه مورد نظر را ندیدید، «بارگذاری رزومه‌های قدیمی‌تر» را در پایین صفحه بزنید.
+        </p>
       )}
 
       {/* DND Context Wrap */}
@@ -462,7 +579,7 @@ export default function EmployerApplicationsPage() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex flex-1 flex-col gap-6 overflow-x-auto pb-4 lg:flex-row">
+        <div className="flex flex-1 flex-col gap-4 overflow-x-auto pb-4 lg:flex-row">
           {COLUMNS.map((column) => {
             const columnApps = filteredApplications.filter((app) => app.status === column.id);
 
@@ -490,8 +607,8 @@ export default function EmployerApplicationsPage() {
       </DndContext>
 
       {/* دکمه بارگذاری بیشتر رزومه‌ها */}
-      {hasMore && !searchTerm && (
-        <div className="mt-8 flex justify-center">
+      {hasMore && !searchTerm && selectedJobId === JOB_FILTER_ALL && (
+        <div className="mt-6 flex justify-center">
           <Button 
             variant="outline" 
             onClick={handleLoadMore} 
@@ -504,9 +621,9 @@ export default function EmployerApplicationsPage() {
         </div>
       )}
 
-      {searchTerm && hasMore && (
-        <p className="text-center text-xs text-slate-400 mt-6">
-          * جستجو در میان رزومه‌های لود شده انجام می‌شود. برای جستجوی رزومه‌های قدیمی‌تر، ابتدا فیلتر را پاک کرده و رزومه‌های بیشتری بارگذاری کنید.
+      {(searchTerm || selectedJobId !== JOB_FILTER_ALL) && hasMore && (
+        <p className="text-center text-xs text-slate-400 mt-4">
+          * جستجو/فیلتر در میان رزومه‌های لود شده انجام می‌شود. برای دیدن رزومه‌های قدیمی‌تر، ابتدا فیلترها را پاک کرده و رزومه‌های بیشتری بارگذاری کنید.
         </p>
       )}
     </div>

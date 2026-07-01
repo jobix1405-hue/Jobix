@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Menu, Bell, BellRing, Building2, ShieldCheck, User, Megaphone, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, Bell, BellRing, Building2, ShieldCheck, User, Megaphone, X, ChevronDown, Settings, LogOut } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { createClient } from "@/lib/supabase";
 
@@ -23,9 +24,10 @@ interface Announcement {
 }
 
 export function DashboardHeader() {
-  const { toggleSidebar, user } = useStore();
+  const { toggleSidebar, user, setUser } = useStore();
   const supabase = createClient();
-  
+  const router = useRouter();
+
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -33,6 +35,12 @@ export function DashboardHeader() {
 
   // 👈 استیت‌های اطلاعیه سراسری
   const [activeAnnouncement, setActiveAnnouncement] = useState<Announcement | null>(null);
+
+  // 👈 استیت‌های منوی کاربر (دراپ‌داون خروج/تنظیمات) و اطلاعات برند کارفرما
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const [employerCompanyName, setEmployerCompanyName] = useState<string | null>(null);
+  const [employerLogoUrl, setEmployerLogoUrl] = useState<string | null>(null);
 
   // واکشی نوتیفیکیشن‌ها و اطلاعیه‌ها
   useEffect(() => {
@@ -87,11 +95,34 @@ export function DashboardHeader() {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, user?.role, supabase]);
 
-  // بستن منو وقتی بیرونش کلیک میشه
+  // 👈 واکشی نام شرکت و لوگو (فقط برای کارفرما) تا در هدر به‌جای شماره موبایل نمایش داده شود
+  useEffect(() => {
+    if (!user?.id || user?.role !== 'employer') return;
+
+    const fetchEmployerBrand = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('company_name, logo_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (data) {
+        setEmployerCompanyName(data.company_name || null);
+        setEmployerLogoUrl(data.logo_url || null);
+      }
+    };
+
+    fetchEmployerBrand();
+  }, [user?.id, user?.role, supabase]);
+
+  // بستن منوها وقتی بیرونشان کلیک میشه
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -101,11 +132,12 @@ export function DashboardHeader() {
   const handleToggleDropdown = async () => {
     const willOpen = !isDropdownOpen;
     setIsDropdownOpen(willOpen);
+    setIsUserMenuOpen(false);
 
     if (willOpen && unreadCount > 0 && user?.id) {
       setUnreadCount(0);
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      
+
       await supabase
         .from('notifications')
         .update({ is_read: true })
@@ -114,7 +146,22 @@ export function DashboardHeader() {
     }
   };
 
-  // 👈 هندلر بستن بنر اطلاعیه
+  // 👈 باز/بسته کردن منوی کاربر (تنظیمات و خروج)
+  const handleToggleUserMenu = () => {
+    setIsUserMenuOpen(prev => !prev);
+    setIsDropdownOpen(false);
+  };
+
+  // 👈 تابع خروج از حساب کاربری (منتقل شده از سایدبار به این دراپ‌داون)
+  const handleLogout = async () => {
+    setIsUserMenuOpen(false);
+    await supabase.auth.signOut();
+    setUser(null);
+    router.push("/login");
+    router.refresh();
+  };
+
+  // 👈 بستن بنر اطلاعیه
   const dismissAnnouncement = () => {
     if (!activeAnnouncement) return;
     const dismissedIds = JSON.parse(localStorage.getItem("dismissed_announcements") || "[]");
@@ -129,9 +176,21 @@ export function DashboardHeader() {
     });
   };
 
+  // 👈 مسیر صفحه تنظیمات بر اساس نقش کاربر (ادمین فعلاً صفحه تنظیمات اختصاصی ندارد)
+  const settingsHref = user?.role === 'employer'
+    ? '/employer/settings'
+    : user?.role === 'job_seeker'
+      ? '/job-seeker/settings'
+      : null;
+
+  const roleLabel = user?.role === 'employer' ? 'حساب کارفرما' : user?.role === 'admin' ? 'مدیر سیستم' : 'حساب کارجو';
+
+  const hasEmployerLogo = user?.role === 'employer' && !!employerLogoUrl;
+  const headerDisplayName = user?.role === 'employer' && employerCompanyName ? employerCompanyName : (user?.phone || 'در حال بارگذاری...');
+
   return (
     <div className="flex flex-col sticky top-0 z-30 w-full">
-      
+
       {/* 👈 بنر اطلاعیه سراسری ادمین (فقط اگر پیامی باشد رندر می‌شود) */}
       {activeAnnouncement && (
         <div className="bg-primary px-4 py-3 text-white flex items-start sm:items-center justify-between gap-4 animate-in slide-in-from-top-4 shadow-md">
@@ -144,8 +203,8 @@ export function DashboardHeader() {
               {activeAnnouncement.body}
             </p>
           </div>
-          <button 
-            onClick={dismissAnnouncement} 
+          <button
+            onClick={dismissAnnouncement}
             className="shrink-0 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
             title="بستن پیام"
           >
@@ -167,10 +226,10 @@ export function DashboardHeader() {
             <button onClick={handleToggleDropdown} className="relative rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
               {unreadCount > 0 ? (
                 <>
-                  <BellRing className="h-5 w-5 text-secondary animate-pulse" />
-                  <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-secondary ring-2 ring-white"></span>
+                  <BellRing className="h-5 w-5 text-secondary animate-bell-ring" />
+                  {/* Badge عدد نوتیفیکیشن‌های خوانده‌نشده */}
+                  <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-bold text-white ring-2 ring-white shadow-md">
+                    {unreadCount > 9 ? "+9" : unreadCount}
                   </span>
                 </>
               ) : (
@@ -214,12 +273,75 @@ export function DashboardHeader() {
               </div>
             )}
           </div>
-          
-          <div className="flex items-center gap-3 border-r border-slate-200 pr-4">
-            <span className="hidden text-sm font-bold text-slate-700 sm:block" dir="ltr">{user?.phone || 'در حال بارگذاری...'}</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm">
-              {user?.role === 'employer' ? <Building2 className="h-5 w-5" /> : user?.role === 'admin' ? <ShieldCheck className="h-5 w-5" /> : <User className="h-5 w-5" />}
-            </div>
+
+          {/* 👈 دراپ‌داون کاربر: جایگزین بلوک قبلی (شماره موبایل + آیکون). شامل لوگوی شرکت (کارفرما)، لینک تنظیمات/رمز عبور و دکمه خروج */}
+          <div className="relative border-r border-slate-200 pr-4" ref={userMenuRef}>
+            <button
+              onClick={handleToggleUserMenu}
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 hover:bg-slate-100 transition-colors"
+            >
+              <span className="hidden text-sm font-bold text-slate-700 sm:block" dir={hasEmployerLogo || (user?.role === 'employer' && employerCompanyName) ? 'rtl' : 'ltr'}>
+                {headerDisplayName}
+              </span>
+
+              {hasEmployerLogo ? (
+                <img
+                  src={employerLogoUrl as string}
+                  alt={employerCompanyName || 'لوگوی شرکت'}
+                  className="h-10 w-10 rounded-full object-cover border border-slate-200 shadow-sm"
+                />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm">
+                  {user?.role === 'employer' ? <Building2 className="h-5 w-5" /> : user?.role === 'admin' ? <ShieldCheck className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                </div>
+              )}
+
+              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform hidden sm:block ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute left-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4 origin-top-left z-50">
+                <div className="flex items-center gap-3 bg-slate-50 px-4 py-4 border-b border-slate-100">
+                  {hasEmployerLogo ? (
+                    <img
+                      src={employerLogoUrl as string}
+                      alt={employerCompanyName || 'لوگوی شرکت'}
+                      className="h-11 w-11 rounded-full object-cover border border-slate-200 shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm">
+                      {user?.role === 'employer' ? <Building2 className="h-5 w-5" /> : user?.role === 'admin' ? <ShieldCheck className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate" dir={user?.role === 'employer' && employerCompanyName ? 'rtl' : 'ltr'}>
+                      {headerDisplayName}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">{roleLabel}</p>
+                  </div>
+                </div>
+
+                <div className="py-2">
+                  {settingsHref && (
+                    <Link
+                      href={settingsHref}
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <Settings className="h-4 w-4 text-slate-400" />
+                      تنظیمات و تغییر رمز عبور
+                    </Link>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    خروج از حساب
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>

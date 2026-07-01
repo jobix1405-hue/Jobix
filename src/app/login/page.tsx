@@ -4,7 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Key, MessageSquare, Info } from "lucide-react";
+import { ArrowRight, CheckCircle2, AlertCircle, Loader2, ShieldAlert, Key, MessageSquare, Info, Home, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { createClient } from "@/lib/supabase";
@@ -29,6 +29,19 @@ function LoginForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // 🔥 استیت جدید: پیام راهنمای آبی رنگ (برای فراموشی رمز)
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // 👈 استیت راهنمای ورود برای کاربرانی که بار اول است وارد می‌شوند
+  const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
+
+  // نمایش راهنما فقط اگر کاربر قبلاً آن را نبسته باشد
+  useEffect(() => {
+    const dismissed = localStorage.getItem("jobix_login_hint_dismissed");
+    if (!dismissed) setShowFirstTimeHint(true);
+  }, []);
+
+  const dismissFirstTimeHint = () => {
+    localStorage.setItem("jobix_login_hint_dismissed", "1");
+    setShowFirstTimeHint(false);
+  };
 
   // در صورت مسدود بودن، کاربر را خارج می‌کنیم
   useEffect(() => {
@@ -72,22 +85,20 @@ function LoginForm() {
       return;
     }
 
-    // ۴. بروزرسانی استیت سراسری سیستم
-    setUser({
+   setUser({
       id: userId,
       phone: userPhone,
       role: profile?.role || null
     });
 
-    router.refresh();
-
-    // ۵. مسیردهی هوشمند بر اساس نقش (Role)
+    // 🔥 رفع باگ لوپ: به‌جای router.push از ناوبری کامل استفاده می‌کنیم
+    // تا مطمئن شویم کوکی سشن قبل از چک شدن توسط proxy.ts کامل ثبت شده است
     if (profile?.role) {
       let redirectUrl = '/job-seeker';
       if (profile.role === 'admin') redirectUrl = '/admin';
       else if (profile.role === 'employer') redirectUrl = '/employer';
 
-      router.push(nextUrl || redirectUrl);
+      window.location.href = nextUrl || redirectUrl;
     } else {
       // اگر کاربر نقشی نداشت (ثبت‌نام جدید)
       let intendedRole: "employer" | "job_seeker" | null = null;
@@ -117,14 +128,14 @@ function LoginForm() {
           }, { onConflict: 'employer_id' });
         }
         
-        setUser({
+       setUser({
           id: userId,
           phone: userPhone,
           role: intendedRole
         });
-        router.push(nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker'));
+        window.location.href = nextUrl || (intendedRole === 'employer' ? '/employer' : '/job-seeker');
       } else {
-        router.push('/onboarding');
+        window.location.href = '/onboarding';
       }
     }
   };
@@ -249,6 +260,15 @@ function LoginForm() {
         )}
 
         <div className="p-8 sm:p-10 relative">
+
+          {/* 👈 دکمه بازگشت به خانه */}
+          <Link
+            href="/"
+            title="بازگشت به صفحه اصلی"
+            className="absolute top-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100 hover:text-primary transition-colors"
+          >
+            <Home className="h-4 w-4" />
+          </Link>
           
           {/* لوگو */}
           <div className="mb-8 flex justify-center">
@@ -319,6 +339,24 @@ function LoginForm() {
                   برای ادامه، شماره موبایل خود را وارد کنید
                 </p>
               </div>
+
+              {/* 👈 راهنمای ورود برای کاربرانی که بار اول است وارد می‌شوند */}
+              {showFirstTimeHint && (
+                <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 border border-slate-100 animate-in fade-in slide-in-from-top-2 relative">
+                  <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+                  <p className="leading-relaxed pl-4">
+                    اولین بار است وارد می‌شوید؟ شماره موبایل خود را وارد کنید تا یک کد تایید پیامکی برایتان ارسال شود؛ نیازی به رمز عبور نیست.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={dismissFirstTimeHint}
+                    className="absolute top-2 left-2 text-slate-300 hover:text-slate-500 transition-colors"
+                    title="بستن راهنما"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Input

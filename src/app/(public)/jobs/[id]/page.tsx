@@ -143,21 +143,22 @@ export default function SingleJobPage() {
 
     setIsChatRequesting(true);
     try {
-      // 👈 واکشی فیلد is_deleted_by_employer برای تشخیص مسدودی چت
+      // 👈 واکشی فیلدهای حذف برای تشخیص مسدودی چت از هر دو طرف
       const { data: existingConv } = await supabase
         .from('conversations')
-        .select('id, is_deleted_by_employer') 
+        .select('id, is_deleted_by_employer, is_deleted_by_seeker') 
         .eq('employer_id', jobDetails.employer_id)
         .eq('job_seeker_id', user.id)
         .eq('job_id', jobDetails.id)
         .maybeSingle();
 
       if (existingConv) {
-        // اگر کارفرما قبلاً چت را پاک (رد) کرده بود، دوباره آن را فعال (Revive) می‌کنیم
-        if (existingConv.is_deleted_by_employer) {
+        // اگر کارفرما یا خود کارجو قبلاً چت را پاک/رد کرده بود، دوباره آن را فعال (Revive) می‌کنیم
+        if (existingConv.is_deleted_by_employer || existingConv.is_deleted_by_seeker) {
           const { error } = await supabase.from('conversations')
             .update({ 
               is_deleted_by_employer: false, 
+              is_deleted_by_seeker: false,
               status: 'pending_employer', 
               requested_by: 'job_seeker',
               updated_at: new Date().toISOString()

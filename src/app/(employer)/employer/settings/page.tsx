@@ -184,8 +184,8 @@ export default function EmployerSettingsPage() {
   if (isLoadingData) return <div className="flex h-[60vh] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div></div>;
 
   return (
-    <div className="mx-auto max-w-4xl animate-in fade-in duration-500 pb-10">
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-5 gap-4">
+    <div className="mx-auto max-w-4xl animate-in fade-in duration-500 pb-6">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-5 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">تنظیمات پروفایل شرکت</h1>
           <p className="mt-2 text-sm text-slate-500">اطلاعات برند و راه‌های ارتباطی شرکت خود را مدیریت کنید.</p>
@@ -198,36 +198,36 @@ export default function EmployerSettingsPage() {
       </div>
 
       {errorMessage && (
-        <div className="mb-6 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-600 border border-red-100">
           <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" /> <p>{errorMessage}</p>
         </div>
       )}
 
       {/* فرم اطلاعات شرکت */}
-      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-8 lg:grid-cols-3 mb-10">
-        <div className="lg:col-span-1 space-y-6">
-          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
+        <div className="lg:col-span-1 space-y-4">
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
             <FileUpload label="لوگوی شرکت" defaultImage={currentLogoUrl} onChange={(file) => setLogoFile(file)} />
-            <div className="mt-6 flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-800 border border-blue-100">
+            <div className="mt-4 flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-800 border border-blue-100">
               <Info className="h-5 w-5 shrink-0 mt-0.5 text-blue-500" />
               <p className="text-xs leading-relaxed font-medium">لوگوی شما در تمامی آگهی‌ها نمایش داده می‌شود. شرکت‌های دارای لوگو ۵۰٪ بازدید بیشتری دارند.</p>
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-3xl border border-slate-100 bg-white p-6 sm:p-8 shadow-sm">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 sm:p-6 shadow-sm">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input label="نام شرکت / برند *" {...register("companyName")} error={errors.companyName?.message} placeholder="مثلاً: جابیکس تک" />
               <Input label="وب‌سایت" {...register("website")} error={errors.website?.message} placeholder="https://example.com" dir="ltr" />
               <Input label="ایمیل عمومی شرکت *" {...register("email")} error={errors.email?.message} placeholder="info@company.com" dir="ltr" />
               <Input label="شماره تماس ثابت *" {...register("phone")} error={errors.phone?.message} placeholder="۰۲۱..." dir="ltr" />
             </div>
-            <div className="mt-6"><Input label="آدرس دفتر مرکزی *" {...register("address")} error={errors.address?.message} placeholder="شهر، خیابان..." /></div>
-            <div className="mt-6"><Textarea label="درباره شرکت (معرفی کوتاه) *" {...register("bio")} error={errors.bio?.message} className="min-h-[150px]" /></div>
+            <div className="mt-4"><Input label="آدرس دفتر مرکزی *" {...register("address")} error={errors.address?.message} placeholder="شهر، خیابان..." /></div>
+            <div className="mt-4"><Textarea label="درباره شرکت (معرفی کوتاه) *" {...register("bio")} error={errors.bio?.message} className="min-h-[150px]" /></div>
           </div>
           <div className="flex justify-end">
-            <Button type="submit" size="lg" className="rounded-2xl px-10 shadow-lg shadow-primary/20 h-12" isLoading={isSubmitting}>
+            <Button type="submit" size="lg" className="rounded-2xl px-6 shadow-lg shadow-primary/20 h-12" isLoading={isSubmitting}>
               <Save className="ml-2 h-5 w-5" /> ذخیره تغییرات نهایی
             </Button>
           </div>
@@ -235,8 +235,8 @@ export default function EmployerSettingsPage() {
       </form>
 
       {/* 🔥 فرم تنظیم رمز عبور */}
-      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-12">
-        <div className="bg-slate-50 border-b border-slate-100 p-6 flex items-center gap-3">
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-8">
+        <div className="bg-slate-50 border-b border-slate-100 p-4 flex items-center gap-3">
           <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-200 text-primary">
             <Lock className="h-5 w-5" />
           </div>
@@ -246,15 +246,15 @@ export default function EmployerSettingsPage() {
           </div>
         </div>
         
-        <form onSubmit={handleUpdatePassword} className="p-6 sm:p-8">
+        <form onSubmit={handleUpdatePassword} className="p-4 sm:p-6">
           {passwordMessage && (
-            <div className={`mb-6 flex items-start gap-2 rounded-xl p-4 text-sm border ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+            <div className={`mb-4 flex items-start gap-2 rounded-xl p-4 text-sm border ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
               {passwordMessage.type === 'success' ? <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" /> : <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />}
               <p className="font-bold">{passwordMessage.text}</p>
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-2xl">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
             <Input 
               label="رمز عبور جدید" 
               type="password"
@@ -275,8 +275,8 @@ export default function EmployerSettingsPage() {
             />
           </div>
 
-          <div className="mt-6 flex">
-            <Button type="submit" isLoading={isUpdatingPassword} disabled={!password || !confirmPassword} className="rounded-xl px-8 h-11 bg-slate-800 hover:bg-slate-900 text-white">
+          <div className="mt-4 flex">
+            <Button type="submit" isLoading={isUpdatingPassword} disabled={!password || !confirmPassword} className="rounded-xl px-6 h-11 bg-slate-800 hover:bg-slate-900 text-white">
               <Save className="ml-2 h-4 w-4" /> ذخیره رمز عبور
             </Button>
           </div>

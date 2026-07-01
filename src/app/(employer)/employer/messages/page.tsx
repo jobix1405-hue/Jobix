@@ -289,7 +289,7 @@ export default function EmployerMessagesPage() {
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {isLoadingChats ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : displayList.length > 0 ? (
             displayList.map((conv) => {
               const isSeekerOnline = onlineUsers.includes(conv.job_seeker_id);
@@ -325,7 +325,7 @@ export default function EmployerMessagesPage() {
               );
             })
           ) : (
-            <div className="text-center py-10 text-slate-400 text-sm px-4">
+            <div className="text-center py-6 text-slate-400 text-sm px-4">
               {activeTab === "requests" ? (
                 <>
                   <BellRing className="h-10 w-10 mx-auto mb-3 opacity-20" />
@@ -376,12 +376,12 @@ export default function EmployerMessagesPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
               
               {activeChat.status === 'pending_employer' && (
-                <div className="flex flex-col items-center justify-center py-10 my-10 bg-white border border-slate-200 rounded-3xl shadow-sm text-center p-6 mx-4">
+                <div className="flex flex-col items-center justify-center py-6 my-6 bg-white border border-slate-200 rounded-3xl shadow-sm text-center p-4 mx-4">
                   <div className="h-16 w-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mb-4">
                     <ShieldAlert className="h-8 w-8" />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 mb-2">درخواست شروع چت</h3>
-                  <p className="text-sm text-slate-500 mb-6 max-w-sm">
+                  <p className="text-sm text-slate-500 mb-4 max-w-sm">
                     این کارجو برای ارتباط با شما درخواست داده است. برای مشاهده پیام‌ها و پاسخگویی باید درخواست را بپذیرید.
                   </p>
                   <div className="flex gap-4 w-full sm:w-auto">
@@ -476,7 +476,7 @@ export default function EmployerMessagesPage() {
           <p className="text-sm text-slate-500 leading-relaxed">
             با این کار ارتباط شما با این کارجو قطع شده و صفحه چت مخفی می‌شود. در صورت نیاز به ارتباط مجدد، باید دوباره درخواست ارسال کنید.
           </p>
-          <div className="mt-8 flex w-full gap-3">
+          <div className="mt-6 flex w-full gap-3">
             <Button 
               variant="outline" 
               className="flex-1 h-12" 

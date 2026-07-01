@@ -30,6 +30,26 @@
 }
 
 /* =========================================
+   انیمیشن زنگوله نوتیفیکیشن (Ring)
+========================================= */
+@keyframes bell-ring {
+  0%   { transform: rotate(0); }
+  10%  { transform: rotate(18deg); }
+  20%  { transform: rotate(-15deg); }
+  30%  { transform: rotate(12deg); }
+  40%  { transform: rotate(-9deg); }
+  50%  { transform: rotate(6deg); }
+  60%  { transform: rotate(-3deg); }
+  70%  { transform: rotate(0); }
+  100% { transform: rotate(0); }
+}
+
+.animate-bell-ring {
+  transform-origin: top center;
+  animation: bell-ring 1.6s ease-in-out infinite;
+}
+
+/* =========================================
    تنظیمات مخصوص چاپ و خروجی PDF (رزومه)
 ========================================= */
 @media print {

@@ -132,7 +132,7 @@ export default function SearchSeekersPage() {
   const activeFiltersCount = [titleTerm, skillTerm, locationTerm].filter(Boolean).length;
 
   return (
-    <div className="flex h-full flex-col animate-in fade-in duration-500 pb-10">
+    <div className="flex h-full flex-col animate-in fade-in duration-500 pb-6">
       
       <button 
         onClick={() => router.back()} 
@@ -141,7 +141,7 @@ export default function SearchSeekersPage() {
         <ChevronLeft className="h-4 w-4" /> بازگشت به پیشخوان
       </button>
 
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
+      <div className="mb-4 flex flex-col items-start justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
             شکارچی استعداد (Headhunting)
@@ -153,7 +153,7 @@ export default function SearchSeekersPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSearch} className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={handleSearch} className="mb-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
             <Filter className="h-4 w-4 text-primary" /> فیلترهای جستجو
@@ -202,7 +202,7 @@ export default function SearchSeekersPage() {
           </div>
         </div>
         <div className="mt-4 flex justify-end">
-          <Button type="submit" className="w-full sm:w-auto h-11 px-8 rounded-xl shadow-lg shadow-primary/20">
+          <Button type="submit" className="w-full sm:w-auto h-11 px-6 rounded-xl shadow-lg shadow-primary/20">
             <Search className="ml-2 h-4 w-4" /> جستجو در رزومه‌ها
           </Button>
         </div>
@@ -215,11 +215,11 @@ export default function SearchSeekersPage() {
         </div>
       ) : seekers.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {seekers.map((seeker) => (
               <div 
                 key={seeker.id} 
-                className="group flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
+                className="group flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-4 transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5"
               >
                 <div>
                   <div className="flex items-start gap-4">
@@ -272,7 +272,7 @@ export default function SearchSeekersPage() {
                   )}
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-100">
+                <div className="mt-4 pt-4 border-t border-slate-100">
                   <Link href={`/employer/applications/${seeker.id}`}>
                     <Button variant="outline" className="w-full rounded-xl bg-slate-50 border-slate-200 text-slate-700 hover:bg-primary hover:text-white hover:border-primary transition-all">
                       مشاهده پروفایل و ارسال پیام
@@ -284,12 +284,12 @@ export default function SearchSeekersPage() {
           </div>
 
           {hasMore && (
-            <div className="mt-10 flex justify-center">
+            <div className="mt-6 flex justify-center">
               <Button 
                 variant="outline" 
                 onClick={handleLoadMore} 
                 isLoading={isLoadingMore}
-                className="rounded-xl border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 bg-white shadow-sm px-8"
+                className="rounded-xl border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 bg-white shadow-sm px-6"
               >
                 {!isLoadingMore && <ChevronDown className="ml-2 h-4 w-4" />}
                 نمایش کارجویان بیشتر

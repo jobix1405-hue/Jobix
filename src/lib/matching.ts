@@ -14,7 +14,8 @@ interface JobData {
 }
 
 // تابع نرمال‌سازی حروف فارسی و انگلیسی (برای اینکه سرچ دقیق‌تر باشد)
-const normalizeText = (text?: string | null) => {
+// 🔥 export شد تا در سایر بخش‌های پروژه (مثل تطبیق دوره‌های آکادمی با عنوان شغلی) هم قابل استفاده باشد
+export const normalizeText = (text?: string | null) => {
   if (!text) return "";
   return text
     .toLowerCase()

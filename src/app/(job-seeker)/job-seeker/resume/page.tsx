@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -7,13 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { 
   User, Briefcase, GraduationCap, Code, CheckCircle2, 
-  Save, AlertCircle, Camera, Plus, Trash2, Video, Sparkles, Loader2, Upload
+  Save, AlertCircle, Camera, Plus, Trash2, Video, Sparkles, Loader2, Upload, Award, Clock, PlayCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 
@@ -33,7 +30,7 @@ const educationSchema = z.object({
 const resumeSchema = z.object({
   firstName: z.string().min(2, "نام باید حداقل ۲ حرف باشد"),
   lastName: z.string().min(2, "نام خانوادگی باید حداقل ۲ حرف باشد"),
-  jobTitle: z.string().min(3, "عنوان تخصصی خود را وارد کنید"),
+  jobTitle: z.string().min(3, "عنوان شغلی خود را وارد کنید"),
   aboutMe: z.string().max(1000, "توضیحات نمی‌تواند بیشتر از ۱۰۰۰ حرف باشد").optional(),
   skills: z.string().optional(),
   workStatus: z.enum(['ready', 'negotiating', 'hired']),
@@ -51,7 +48,7 @@ export default function ResumeBuilderPage() {
   const supabase = createClient();
   const { user } = useStore();
 
-  const [activeTab, setActiveTab] = useState<"personal" | "experience" | "education" | "skills" | "video">("personal");
+  const [activeTab, setActiveTab] = useState<"personal" | "experience" | "education" | "skills" | "courses" | "video">("personal");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -62,8 +59,15 @@ export default function ResumeBuilderPage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // استیت مودال ویدیو
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  // دوره‌های آکادمی که توسط کارجو «تکمیل» شده‌اند (به صورت خودکار از آکادمی می‌آید)
+  const [completedCourses, setCompletedCourses] = useState<{ id: string; title: string; duration: string }[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+
+  // 👈 استیت‌های رزومه ویدیویی (آپلود واقعی به‌جای پیام «به زودی»)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const MAX_VIDEO_SIZE_MB = 25;
 
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm<ResumeFormValues>({
     resolver: zodResolver(resumeSchema),
@@ -105,6 +109,7 @@ export default function ResumeBuilderPage() {
             educations: edu,
           });
           setAvatarUrl(data.avatar_url);
+          setVideoUrl(data.video_resume_url || null);
         }
       } catch (err) {
         console.error("Error:", err);
@@ -114,6 +119,33 @@ export default function ResumeBuilderPage() {
     };
     fetchResume();
   }, [user?.id, reset, supabase]);
+
+  // واکشی خودکار دوره‌های «تکمیل‌شده» آکادمی برای نمایش در رزومه
+  useEffect(() => {
+    const fetchCompletedCourses = async () => {
+      if (!user?.id) return;
+      try {
+        const { data, error } = await supabase
+          .from('course_requests')
+          .select('id, course:courses(id, title, duration)')
+          .eq('job_seeker_id', user.id)
+          .eq('status', 'completed');
+
+        if (error) throw error;
+
+        const formatted = (data || []).map((req: any) => {
+          const course = Array.isArray(req.course) ? req.course[0] : req.course;
+          return { id: course?.id || req.id, title: course?.title || 'دوره نامشخص', duration: course?.duration || '' };
+        });
+        setCompletedCourses(formatted);
+      } catch (err) {
+        console.error("خطا در دریافت دوره‌های تکمیل‌شده:", err);
+      } finally {
+        setIsLoadingCourses(false);
+      }
+    };
+    fetchCompletedCourses();
+  }, [user?.id, supabase]);
 
   // =========================================
   // الگوریتم فشرده‌سازی فوق‌قوی تصویر (Client-Side)
@@ -178,6 +210,67 @@ export default function ResumeBuilderPage() {
     }
   };
 
+  // 👈 هندل آپلود ویدیوی معرفی (رزومه ویدیویی)
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    if (!file.type.startsWith('video/')) {
+      alert("لطفاً یک فایل ویدیویی معتبر انتخاب کنید.");
+      return;
+    }
+    if (file.size > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
+      alert(`حجم ویدیو نباید بیشتر از ${MAX_VIDEO_SIZE_MB} مگابایت باشد. لطفاً ویدیوی کوتاه‌تری (حدود ۳۰ ثانیه) ضبط کنید.`);
+      return;
+    }
+
+    setIsUploadingVideo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `video_${user.id}_${Date.now()}.${fileExt}`;
+      const filePath = `videos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('jobix-storage')
+        .upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage.from('jobix-storage').getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ video_resume_url: publicUrlData.publicUrl })
+        .eq('id', user.id);
+      if (updateError) throw updateError;
+
+      setVideoUrl(publicUrlData.publicUrl);
+    } catch (err) {
+      console.error(err);
+      alert("خطا در آپلود ویدیو. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setIsUploadingVideo(false);
+      if (videoInputRef.current) videoInputRef.current.value = "";
+    }
+  };
+
+  // 👈 هندل حذف ویدیوی معرفی
+  const handleRemoveVideo = async () => {
+    if (!user?.id) return;
+    if (!confirm("آیا از حذف ویدیوی معرفی خود مطمئن هستید؟")) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ video_resume_url: null })
+        .eq('id', user.id);
+      if (error) throw error;
+      setVideoUrl(null);
+    } catch (err) {
+      console.error(err);
+      alert("خطا در حذف ویدیو. لطفاً دوباره تلاش کنید.");
+    }
+  };
+
   // ذخیره فرم
   const onSubmit = async (data: ResumeFormValues) => {
     if (!user?.id) return;
@@ -239,6 +332,7 @@ export default function ResumeBuilderPage() {
             { id: "experience", label: "سوابق شغلی", icon: Briefcase },
             { id: "education", label: "تحصیلات", icon: GraduationCap },
             { id: "skills", label: "مهارت‌ها", icon: Code },
+            { id: "courses", label: "دوره‌های آموزشی", icon: Award },
             { id: "video", label: "رزومه ویدیویی", icon: Video }
           ].map((tab) => {
             const Icon = tab.icon;
@@ -303,7 +397,7 @@ export default function ResumeBuilderPage() {
               <Input label="نام *" placeholder="مثال: علی" {...register("firstName")} error={errors.firstName?.message} />
               <Input label="نام خانوادگی *" placeholder="مثال: محمدی" {...register("lastName")} error={errors.lastName?.message} />
             </div>
-            <Input label="عنوان تخصصی (Job Title) *" placeholder="مثال: برنامه‌نویس ارشد فرانت‌اند" {...register("jobTitle")} error={errors.jobTitle?.message} />
+            <Input label="عنوان شغلی (Job Title) *" placeholder="مثال: برنامه‌نویس ارشد فرانت‌اند" {...register("jobTitle")} error={errors.jobTitle?.message} />
             <Textarea label="درباره من (خلاصه رزومه)" placeholder="یک پاراگراف در مورد تجربه و اهداف خود بنویسید..." className="min-h-[120px]" {...register("aboutMe")} error={errors.aboutMe?.message} />
           </div>
 
@@ -363,20 +457,93 @@ export default function ResumeBuilderPage() {
             <Textarea label="لیست مهارت‌ها" placeholder="مثال: React, مدیریت زمان, فروش B2B, فتوشاپ" className="min-h-[150px]" {...register("skills")} />
           </div>
 
-          {/* 5. رزومه ویدیویی */}
-          <div className={activeTab === "video" ? "block space-y-6" : "hidden"}>
-            <div className="flex flex-col items-center justify-center py-10 bg-gradient-to-b from-slate-50 to-white rounded-2xl border border-slate-200 border-dashed text-center">
-              <div className="h-16 w-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
-                <Video className="h-8 w-8" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">رزومه ویدیویی خود را بسازید</h3>
-              <p className="text-sm text-slate-500 max-w-md mb-6 leading-relaxed">
-                با ضبط یک ویدیوی کوتاه ۳۰ ثانیه‌ای، خودتان را به کارفرمایان معرفی کنید و شانس استخدام خود را ۳ برابر کنید.
-              </p>
-              <Button type="button" onClick={() => setIsVideoModalOpen(true)} className="rounded-xl px-8 h-12 shadow-lg shadow-primary/20">
-                <Upload className="ml-2 h-5 w-5" /> آپلود ویدیوی معرفی
-              </Button>
+          {/* 5. دوره‌های آموزشی (خودکار از آکادمی - فقط نمایشی) */}
+          <div className={activeTab === "courses" ? "block space-y-6" : "hidden"}>
+            <div className="rounded-xl bg-blue-50 p-4 mb-4 border border-blue-100 text-sm text-blue-800 leading-relaxed flex items-start gap-2">
+              <Sparkles className="h-4 w-4 mt-0.5 shrink-0" />
+              این بخش به صورت خودکار تکمیل می‌شود: به محض اینکه یک دوره آکادمی جابیکس را با موفقیت بگذرانید، تیم ما آن را اینجا برای شما ثبت می‌کند. نیازی به وارد کردن دستی نیست.
             </div>
+
+            {isLoadingCourses ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : completedCourses.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-6">هنوز هیچ دوره‌ای از آکادمی جابیکس تکمیل نکرده‌اید.</p>
+            ) : (
+              <div className="space-y-3">
+                {completedCourses.map((course) => (
+                  <div key={course.id} className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                        <Award className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800">{course.title}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">دوره تکمیل‌شده آکادمی جابیکس</p>
+                      </div>
+                    </div>
+                    {course.duration && (
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                        <Clock className="h-3.5 w-3.5" /> {course.duration}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 6. رزومه ویدیویی */}
+          <div className={activeTab === "video" ? "block space-y-6" : "hidden"}>
+            {videoUrl ? (
+              <div className="flex flex-col items-center gap-5 py-4">
+                <video
+                  key={videoUrl}
+                  src={videoUrl}
+                  controls
+                  className="w-full max-w-md rounded-2xl border border-slate-200 shadow-sm bg-black"
+                >
+                  مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+                </video>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => videoInputRef.current?.click()}
+                    isLoading={isUploadingVideo}
+                    className="rounded-xl"
+                  >
+                    <Upload className="ml-2 h-4 w-4" /> جایگزینی ویدیو
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleRemoveVideo}
+                    disabled={isUploadingVideo}
+                    className="rounded-xl border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="ml-2 h-4 w-4" /> حذف ویدیو
+                  </Button>
+                </div>
+                <input type="file" ref={videoInputRef} className="hidden" accept="video/*" onChange={handleVideoUpload} />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 bg-gradient-to-b from-slate-50 to-white rounded-2xl border border-slate-200 border-dashed text-center">
+                <div className="h-16 w-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                  {isUploadingVideo ? <Loader2 className="h-8 w-8 animate-spin" /> : <Video className="h-8 w-8" />}
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">رزومه ویدیویی خود را بسازید</h3>
+                <p className="text-sm text-slate-500 max-w-md mb-2 leading-relaxed">
+                  با ضبط یک ویدیوی کوتاه ۳۰ ثانیه‌ای، خودتان را به کارفرمایان معرفی کنید و شانس استخدام خود را ۳ برابر کنید.
+                </p>
+                <p className="text-xs text-slate-400 mb-6 flex items-center gap-1.5">
+                  <PlayCircle className="h-3.5 w-3.5" /> حداکثر حجم مجاز: {MAX_VIDEO_SIZE_MB} مگابایت
+                </p>
+                <Button type="button" onClick={() => videoInputRef.current?.click()} isLoading={isUploadingVideo} className="rounded-xl px-8 h-12 shadow-lg shadow-primary/20">
+                  <Upload className="ml-2 h-5 w-5" /> آپلود ویدیوی معرفی
+                </Button>
+                <input type="file" ref={videoInputRef} className="hidden" accept="video/*" onChange={handleVideoUpload} />
+              </div>
+            )}
           </div>
 
         </div>
@@ -388,25 +555,6 @@ export default function ResumeBuilderPage() {
           </Button>
         </div>
       </form>
-
-      {/* مودال «به زودی» برای آپلود ویدیو */}
-      <Modal isOpen={isVideoModalOpen} onClose={() => setIsVideoModalOpen(false)}>
-        <div className="flex flex-col items-center text-center py-8">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 bg-amber-400 blur-xl opacity-20 rounded-full animate-pulse"></div>
-            <div className="h-20 w-20 bg-white border-2 border-amber-100 rounded-full flex items-center justify-center shadow-lg relative z-10">
-              <Sparkles className="h-10 w-10 text-amber-500" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-3">این ویژگی به زودی فعال می‌شود!</h2>
-          <p className="text-slate-500 text-sm leading-relaxed max-w-sm mb-8">
-            تیم مهندسی جابیکس در حال آماده‌سازی زیرساخت‌های لازم برای پردازش و فشرده‌سازی ویدیوهای شماست. این قابلیت فوق‌العاده جذاب در آپدیت بعدی در دسترس خواهد بود. منتظر باشید! 🚀
-          </p>
-          <Button onClick={() => setIsVideoModalOpen(false)} className="w-full sm:w-auto px-10 rounded-xl h-12 bg-slate-900 hover:bg-slate-800 text-white border-none">
-            متوجه شدم
-          </Button>
-        </div>
-      </Modal>
 
     </div>
   );

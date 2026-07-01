@@ -16,7 +16,7 @@ export default function EmployerLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
         <DashboardHeader />
         
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-4 lg:p-6">
           {children}
         </main>
       </div>

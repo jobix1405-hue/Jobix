@@ -12,17 +12,48 @@ export default function AdminReportsPage() {
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        const { data, error } = await supabase
+        // ۱. دریافت گزارش‌ها به همراه اطلاعات آگهی (این رابطه مستقیم و سالمه)
+        const { data: reportsData, error: reportsError } = await supabase
           .from('reports')
           .select(`
-            id, reason, description, status, created_at,
-            jobs (id, title, employer_id, profiles(company_name)),
-            profiles!reporter_id_fkey (first_name, last_name, phone_number)
+            id, reason, description, status, created_at, reporter_id,
+            jobs (id, title, employer_id, profiles(company_name))
           `)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        setReports(data || []);
+        if (reportsError) throw reportsError;
+        const rows = reportsData || [];
+
+        // 🔥 رفع باگ PGRST200: قبلاً اینجا با هینت "profiles!reporter_id_fkey" سعی می‌شد
+        // پروفایل گزارش‌دهنده مستقیم توی همون کوئری جوین بشه، اما این اسم دقیقاً با نام
+        // کلید خارجی واقعی روی جدول reports توی دیتابیس مطابقت نداشت و خطا می‌داد.
+        // برای رفع کامل مشکل (بدون وابستگی به اسم دقیق fkey)، پروفایل گزارش‌دهنده‌ها رو
+        // جداگانه واکشی و توی جاوااسکریپت به گزارش‌ها وصل می‌کنیم.
+        const reporterIds = Array.from(
+          new Set(rows.map((r: any) => r.reporter_id).filter(Boolean))
+        );
+
+        let profilesMap: Record<string, any> = {};
+        if (reporterIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, phone_number')
+            .in('id', reporterIds);
+
+          if (profilesError) throw profilesError;
+
+          profilesMap = (profilesData || []).reduce((acc: Record<string, any>, p: any) => {
+            acc[p.id] = p;
+            return acc;
+          }, {});
+        }
+
+        const merged = rows.map((r: any) => ({
+          ...r,
+          profiles: profilesMap[r.reporter_id] || null,
+        }));
+
+        setReports(merged);
       } catch (err) {
         console.error("Error fetching reports:", err);
       } finally {

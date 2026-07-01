@@ -219,12 +219,6 @@ export default function JobSeekerDashboard() {
               </button>
             ))}
           </div>
-
-          <Link href="/jobs/map" className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full sm:w-auto rounded-xl h-10 bg-white border-slate-200 text-slate-700 hover:text-primary hover:border-primary shadow-sm">
-              <Map className="ml-2 h-4 w-4" /> نقشه مشاغل
-            </Button>
-          </Link>
         </div>
       </div>
 

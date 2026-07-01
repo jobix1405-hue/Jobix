@@ -59,10 +59,9 @@ export default function OnboardingPage() {
         }
       }
 
-      // تنظیم استیت و رفتن به پنل مربوطه
+     // تنظیم استیت و رفتن به پنل مربوطه
       setUser({ ...user, role });
-      router.push(role === "employer" ? "/employer" : "/job-seeker");
-      router.refresh();
+      window.location.href = role === "employer" ? "/employer" : "/job-seeker";
       
     } catch (err: any) {
       console.error(err);

@@ -141,7 +141,7 @@ export default function EmployerDashboard() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl animate-in fade-in duration-500 space-y-8">
+    <div className="mx-auto max-w-6xl animate-in fade-in duration-500 space-y-6">
       
       {/* هدر داشبورد */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5">
@@ -177,9 +177,9 @@ export default function EmployerDashboard() {
       </div>
 
       {/* ویجت‌های آماری */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-4">
         
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
             <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
               <Briefcase className="h-6 w-6" />
@@ -192,7 +192,7 @@ export default function EmployerDashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-primary/20 shadow-sm transition-all hover:shadow-md relative overflow-hidden">
+        <div className="bg-white p-4 rounded-3xl border border-primary/20 shadow-sm transition-all hover:shadow-md relative overflow-hidden">
           <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/5 blur-2xl"></div>
           <div className="flex items-center justify-between mb-4 relative z-10">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
@@ -209,7 +209,7 @@ export default function EmployerDashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
             <div className="h-12 w-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 border border-green-100">
               <Eye className="h-6 w-6" />
@@ -225,11 +225,11 @@ export default function EmployerDashboard() {
       </div>
 
       {/* گرید بخش‌های پایینی */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
         <div className="lg:col-span-2">
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-full">
-            <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+          <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm h-full">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-4">
               <h3 className="font-bold text-slate-900 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
                 آخرین رزومه‌های دریافتی
@@ -279,7 +279,7 @@ export default function EmployerDashboard() {
             </div>
 
             {recentApps.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="flex flex-col items-center justify-center py-6 text-center">
                 <FileText className="h-10 w-10 text-slate-300 mb-3" />
                 <p className="text-sm text-slate-500">هنوز رزومه‌ای برای آگهی‌های شما ارسال نشده است.</p>
               </div>
@@ -287,15 +287,15 @@ export default function EmployerDashboard() {
           </div>
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-4">
           
           {!isProfileVerified && (
-            <div className="bg-white p-6 rounded-3xl border border-orange-200 bg-orange-50/50 shadow-sm relative overflow-hidden">
+            <div className="bg-white p-4 rounded-3xl border border-orange-200 bg-orange-50/50 shadow-sm relative overflow-hidden">
               <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
                 <AlertTriangle className="h-5 w-5 text-orange-500" />
                 تکمیل اطلاعات شرکت
               </h3>
-              <p className="text-sm text-slate-600 leading-relaxed mb-6">
+              <p className="text-sm text-slate-600 leading-relaxed mb-4">
                 پروفایل شرکت شما تایید نشده است. کارجویان به شرکت‌های تایید شده ۳ برابر بیشتر اعتماد می‌کنند.
               </p>
               <Link href="/employer/settings">
@@ -306,7 +306,7 @@ export default function EmployerDashboard() {
             </div>
           )}
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
             <h3 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-4">
               دسترسی سریع
             </h3>

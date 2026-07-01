@@ -127,7 +127,7 @@ export default function EmployerJobsPage() {
   return (
     <div className="mx-auto max-w-6xl animate-in fade-in duration-500">
       
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">آگهی‌های من</h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -135,14 +135,14 @@ export default function EmployerJobsPage() {
           </p>
         </div>
         <Link href="/employer/post-job">
-          <Button className="w-full sm:w-auto rounded-xl px-6 h-12">
+          <Button className="w-full sm:w-auto rounded-xl px-4 h-12">
             <Plus className="ml-2 h-5 w-5" />
             ثبت آگهی جدید
           </Button>
         </Link>
       </div>
 
-      <div className="mb-6 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center">
+      <div className="mb-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center">
         <Search className="h-5 w-5 text-slate-400 mr-3" />
         <input
           type="text"
@@ -161,7 +161,7 @@ export default function EmployerJobsPage() {
             return (
               <div 
                 key={job.id} 
-                className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 transition-all hover:border-primary/30 hover:shadow-md"
+                className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-5 transition-all hover:border-primary/30 hover:shadow-md"
               >
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -171,14 +171,14 @@ export default function EmployerJobsPage() {
                     </span>
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-500 mt-3">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500 mt-3">
                     <span className="flex items-center gap-1.5">
                       <span className="text-slate-400">تاریخ ثبت:</span> {formatDate(job.created_at)}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6 border-y lg:border-y-0 lg:border-x border-slate-100 py-4 lg:py-0 lg:px-8">
+                <div className="flex items-center gap-4 border-y lg:border-y-0 lg:border-x border-slate-100 py-4 lg:py-0 lg:px-6">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1.5 text-slate-500 mb-1">
                       <Eye className="h-4 w-4" />
@@ -234,7 +234,7 @@ export default function EmployerJobsPage() {
             );
           })
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 py-10 text-center">
             <div className="mb-4 rounded-full bg-white p-4 shadow-sm text-slate-400">
               <Search className="h-8 w-8" />
             </div>
@@ -259,7 +259,7 @@ export default function EmployerJobsPage() {
           <p className="text-sm text-slate-500 leading-relaxed">
             با حذف این آگهی، تمامی اطلاعات آن از پایگاه داده پاک خواهد شد. (این عملیات غیرقابل بازگشت است)
           </p>
-          <div className="mt-8 flex w-full gap-3">
+          <div className="mt-6 flex w-full gap-3">
             <Button variant="outline" className="flex-1 h-12" onClick={() => setIsDeleteModalOpen(false)}>
               انصراف
             </Button>

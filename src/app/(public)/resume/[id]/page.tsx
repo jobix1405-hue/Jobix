@@ -1,11 +1,9 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { 
   User, Briefcase, GraduationCap, Code, 
-  Phone, Mail, MapPin, Download, ChevronRight, Loader2, AlertCircle 
+  Phone, Mail, MapPin, Download, ChevronRight, Loader2, AlertCircle, Award, Clock, Video
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase";
@@ -25,6 +23,7 @@ interface ResumeData {
   email: string;
   address: string;
   avatar_url: string;
+  video_resume_url: string;
 }
 
 export default function PublicResumePage() {
@@ -32,6 +31,7 @@ export default function PublicResumePage() {
   const supabase = createClient();
   
   const [resume, setResume] = useState<ResumeData | null>(null);
+  const [completedCourses, setCompletedCourses] = useState<{ id: string; title: string; duration: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -45,6 +45,19 @@ export default function PublicResumePage() {
 
         if (error) throw error;
         setResume(data);
+
+        // واکشی دوره‌های آکادمی که این کارجو با موفقیت تکمیل کرده (به صورت خودکار در رزومه نمایش داده می‌شود)
+        const { data: coursesData } = await supabase
+          .from('course_requests')
+          .select('id, course:courses(id, title, duration)')
+          .eq('job_seeker_id', params.id as string)
+          .eq('status', 'completed');
+
+        const formattedCourses = (coursesData || []).map((req: any) => {
+          const course = Array.isArray(req.course) ? req.course[0] : req.course;
+          return { id: course?.id || req.id, title: course?.title || 'دوره نامشخص', duration: course?.duration || '' };
+        });
+        setCompletedCourses(formattedCourses);
       } catch (err) {
         console.error("Error fetching resume:", err);
       } finally {
@@ -188,6 +201,27 @@ export default function PublicResumePage() {
                   </div>
                 </section>
               )}
+
+              {/* دوره‌های آموزشی (خودکار از آکادمی جابیکس) */}
+              {completedCourses.length > 0 && (
+                <section>
+                  <h3 className="text-xl font-bold text-slate-900 border-b-2 border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                    <Award className="h-5 w-5 text-purple-500" /> دوره‌های آموزشی
+                  </h3>
+                  <div className="space-y-3">
+                    {completedCourses.map((course) => (
+                      <div key={course.id} className="flex items-center justify-between bg-slate-50 px-4 py-3 rounded-xl print:border print:border-slate-200 print:bg-white">
+                        <span className="font-bold text-slate-800 text-sm">{course.title}</span>
+                        {course.duration && (
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                            <Clock className="h-3.5 w-3.5" /> {course.duration}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
 
             {/* ستون کناری (چپ) */}
@@ -219,6 +253,23 @@ export default function PublicResumePage() {
             </div>
 
           </div>
+
+          {/* 👈 ویدیوی معرفی کارجو - در پایین صفحه رزومه، بدون نیاز به خروج از صفحه */}
+          {resume.video_resume_url && (
+            <div className="border-t border-slate-100 p-8 sm:p-12 print:hidden">
+              <h3 className="text-xl font-bold text-slate-900 pb-3 mb-4 flex items-center gap-2">
+                <Video className="h-5 w-5 text-primary" /> ویدیوی معرفی
+              </h3>
+              <video
+                src={resume.video_resume_url}
+                controls
+                className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-200 shadow-sm bg-black block"
+              >
+                مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+              </video>
+            </div>
+          )}
+
         </div>
       </div>
     </main>

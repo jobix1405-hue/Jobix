@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase";
 
 interface CourseRequest {
   id: string;
-  status: 'pending' | 'contacted' | 'registered';
+  status: 'pending' | 'contacted' | 'registered' | 'completed';
   created_at: string;
   course: { title: string };
   profiles: { first_name: string; last_name: string; phone_number: string };
@@ -127,7 +127,11 @@ export default function AdminCourseRequestsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {req.status === 'registered' ? (
+                      {req.status === 'completed' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                          دوره تکمیل شد
+                        </span>
+                      ) : req.status === 'registered' ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-green-100 text-green-700 border border-green-200">
                           ثبت‌نام قطعی
                         </span>
@@ -160,8 +164,16 @@ export default function AdminCourseRequestsPage() {
                           </button>
                         )}
                         {req.status === 'registered' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(req.id, 'completed')}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 transition-colors text-xs font-bold"
+                          >
+                            <GraduationCap className="h-3.5 w-3.5" /> تکمیل دوره
+                          </button>
+                        )}
+                        {req.status === 'completed' && (
                           <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" /> تکمیل شده
+                            <CheckCircle2 className="h-4 w-4 text-green-500" /> به رزومه اضافه شد
                           </span>
                         )}
                       </div>

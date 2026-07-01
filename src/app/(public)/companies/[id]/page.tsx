@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -33,6 +31,14 @@ const COMPANY_BADGES = [
   { id: "pro_management", label: "مدیریت حرفه‌ای" },
 ];
 
+// 👈 معیارهای امتیازدهی چندگانه به شرکت
+const COMPANY_CRITERIA = [
+  { id: "environment", label: "محیط کار" },
+  { id: "payment", label: "پرداخت به‌موقع حقوق" },
+  { id: "management", label: "مدیریت و رهبری" },
+  { id: "growth", label: "فرصت رشد و یادگیری" },
+];
+
 export default function CompanyProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -46,7 +52,7 @@ export default function CompanyProfilePage() {
 
   // استیت‌های مودال ارزیابی
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
-  const [score, setScore] = useState<number>(0);
+  const [criteriaScores, setCriteriaScores] = useState<Record<string, number>>({});
   const [selectedBadge, setSelectedBadge] = useState<string>("");
   const [reviewText, setReviewText] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
@@ -102,14 +108,23 @@ export default function CompanyProfilePage() {
   const handleSubmitRating = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id || !company?.id) return;
-    if (score === 0 || !selectedBadge) return alert("لطفاً هم امتیاز ستاره‌ای و هم نشان را انتخاب کنید.");
+
+    const filledCriteria = COMPANY_CRITERIA.filter(c => criteriaScores[c.id] > 0);
+    if (filledCriteria.length < COMPANY_CRITERIA.length || !selectedBadge) {
+      return alert("لطفاً به همه معیارها امتیاز دهید و یک نشان را انتخاب کنید.");
+    }
+
+    const avgScore = Math.round(
+      (Object.values(criteriaScores).reduce((a, b) => a + b, 0) / COMPANY_CRITERIA.length) * 10
+    ) / 10;
 
     setIsSubmittingRating(true);
     try {
       const { error } = await supabase.from('ratings').insert({
         rater_id: user.id,
         ratee_id: company.id,
-        score,
+        score: avgScore,
+        criteria_scores: criteriaScores,
         badge: selectedBadge,
         review_text: reviewText
       });
@@ -119,8 +134,9 @@ export default function CompanyProfilePage() {
         throw error;
       }
 
-      setRatings([...ratings, { score, badge: selectedBadge, review_text: reviewText }]);
+      setRatings([...ratings, { score: avgScore, criteria_scores: criteriaScores, badge: selectedBadge, review_text: reviewText }]);
       setIsRatingModalOpen(false);
+      setCriteriaScores({});
       
     } catch (err: any) {
       alert(err.message || "خطا در ثبت ارزیابی.");
@@ -338,20 +354,24 @@ export default function CompanyProfilePage() {
         <form onSubmit={handleSubmitRating} className="space-y-6 pt-2">
           
           {/* بخش امتیازدهی ستاره‌ای */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-3 text-center">امتیاز شما به این شرکت</label>
-            <div className="flex justify-center gap-2 flex-row-reverse">
-              {[5, 4, 3, 2, 1].map((star) => (
-                <button 
-                  key={star} 
-                  type="button" 
-                  onClick={() => setScore(star)} 
-                  className="transition-transform hover:scale-110"
-                >
-                  <Star className={`h-10 w-10 ${score >= star ? 'fill-orange-400 text-orange-400' : 'text-slate-200'}`} />
-                </button>
-              ))}
-            </div>
+          <div className="space-y-4">
+            {COMPANY_CRITERIA.map((criterion) => (
+              <div key={criterion.id}>
+                <label className="block text-sm font-bold text-slate-700 mb-2">{criterion.label}</label>
+                <div className="flex gap-1.5 flex-row-reverse">
+                  {[5, 4, 3, 2, 1].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setCriteriaScores(prev => ({ ...prev, [criterion.id]: star }))}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star className={`h-7 w-7 ${(criteriaScores[criterion.id] || 0) >= star ? 'fill-orange-400 text-orange-400' : 'text-slate-200'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* بخش انتخاب نشان (Badge) */}

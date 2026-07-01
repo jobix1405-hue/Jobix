@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   Search, Briefcase, Trash2, ExternalLink, 
-  Loader2, AlertCircle, Building2, CalendarClock 
+  Loader2, AlertCircle, Building2, CalendarClock, Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -17,6 +17,7 @@ interface AdminJobData {
   status: string;
   created_at: string;
   views: number;
+  viewed_by_admin: boolean; // 👈 وضعیت "خوانده شده/نشده" برای مانیتورینگ ادمین
   employer: {
     company_name: string;
   };
@@ -57,7 +58,7 @@ export default function AdminJobsPage() {
       const { data, error } = await supabase
         .from('jobs')
         .select(`
-          id, title, status, created_at, views,
+          id, title, status, created_at, views, viewed_by_admin,
           profiles!jobs_employer_id_fkey (company_name)
         `)
         .order('created_at', { ascending: false });
@@ -71,6 +72,7 @@ export default function AdminJobsPage() {
         status: job.status,
         created_at: job.created_at,
         views: job.views,
+        viewed_by_admin: job.viewed_by_admin ?? true, // 👈 اگر مقدار نال بود، خوانده‌شده در نظر گرفته شود
         employer: Array.isArray(job.profiles) ? job.profiles[0] : job.profiles,
       })) || [];
 
@@ -86,6 +88,28 @@ export default function AdminJobsPage() {
     job.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (job.employer?.company_name && job.employer.company_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // 👈 تعداد آگهی‌های تازه ثبت شده که هنوز توسط ادمین بررسی نشده‌اند
+  const newJobsCount = jobs.filter(job => !job.viewed_by_admin).length;
+
+  // 👈 علامت‌گذاری آگهی به عنوان «خوانده شده» با کلیک ادمین روی ردیف
+  const markAsRead = async (job: AdminJobData) => {
+    if (job.viewed_by_admin) return; // از ارسال درخواست‌های غیرضروری جلوگیری می‌کند
+
+    // آپدیت آنی رابط کاربری (Optimistic)
+    setJobs(prev => prev.map(j => j.id === job.id ? { ...j, viewed_by_admin: true } : j));
+
+    const { error } = await supabase
+      .from('jobs')
+      .update({ viewed_by_admin: true })
+      .eq('id', job.id);
+
+    if (error) {
+      console.error("خطا در علامت‌گذاری آگهی به عنوان خوانده‌شده:", error);
+      // در صورت بروز خطا در دیتابیس، وضعیت قبلی بازگردانده می‌شود
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, viewed_by_admin: false } : j));
+    }
+  };
 
   const confirmDelete = (id: string) => {
     setJobToDelete(id);
@@ -131,6 +155,18 @@ export default function AdminJobsPage() {
         </p>
       </div>
 
+      {/* 👈 بنر آگهی‌های جدید در انتظار بررسی */}
+      {newJobsCount > 0 && (
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3.5 text-amber-800 animate-in fade-in duration-500">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white shadow-sm">
+            <Bell className="h-4 w-4" />
+          </span>
+          <p className="text-sm font-medium">
+            <span className="font-extrabold">{newJobsCount.toLocaleString('fa-IR')}</span> آگهی شغلی جدید در انتظار بررسی شماست. برای علامت‌گذاری هر آگهی به عنوان «خوانده شده»، روی ردیف آن کلیک کنید.
+          </p>
+        </div>
+      )}
+
       {/* جستجو */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center">
         <Search className="h-5 w-5 text-slate-400 mr-3" />
@@ -158,45 +194,65 @@ export default function AdminJobsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredJobs.length > 0 ? (
-                filteredJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{job.title}</div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5" />
-                        {job.employer?.company_name || 'شرکت نامشخص'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {getStatusBadge(job.status)}
-                    </td>
-                    <td className="px-6 py-4 text-center font-medium text-slate-600">
-                      {job.views || 0}
-                    </td>
-                    <td className="px-6 py-4 text-center text-slate-500">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <CalendarClock className="h-4 w-4" />
-                        {new Date(job.created_at).toLocaleDateString('fa-IR')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-left">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link href={`/jobs/${job.id}`} target="_blank">
-                          <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="مشاهده در سایت">
-                            <ExternalLink className="h-4 w-4" />
+                filteredJobs.map((job) => {
+                  const isNew = !job.viewed_by_admin;
+                  return (
+                    <tr 
+                      key={job.id} 
+                      onClick={() => markAsRead(job)}
+                      className={`transition-colors cursor-pointer ${
+                        isNew 
+                          ? 'bg-amber-50/70 hover:bg-amber-50 border-r-4 border-r-amber-400' 
+                          : 'hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isNew && (
+                            <span className="inline-flex shrink-0 items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-400 text-white">
+                              جدید
+                            </span>
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-900">{job.title}</div>
+                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                              <Building2 className="h-3.5 w-3.5" />
+                              {job.employer?.company_name || 'شرکت نامشخص'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {getStatusBadge(job.status)}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-slate-600">
+                        {job.views || 0}
+                      </td>
+                      <td className="px-6 py-4 text-center text-slate-500">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <CalendarClock className="h-4 w-4" />
+                          {new Date(job.created_at).toLocaleDateString('fa-IR')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-left">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/jobs/${job.id}`} target="_blank" onClick={(e) => e.stopPropagation()}>
+                            <button className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="مشاهده در سایت">
+                              <ExternalLink className="h-4 w-4" />
+                            </button>
+                          </Link>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); confirmDelete(job.id); }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors" 
+                            title="حذف دائمی"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
-                        </Link>
-                        <button 
-                          onClick={() => confirmDelete(job.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors" 
-                          title="حذف دائمی"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-400">

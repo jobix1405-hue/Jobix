@@ -30,9 +30,38 @@ export default async function proxy(request: NextRequest) {
   )
 
   // دریافت اطلاعات کاربر فعلی
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // 🔥 رفع باگ: وقتی کوکی سشن کاربر قدیمی/نامعتبر باشه (مثلاً بعد از تغییر پروژه سوپابیس،
+  // پاک شدن دستی یوزر از دیتابیس، یا صرفاً منقضی شدن رفرش‌توکن روی مرورگر)، تابع getUser
+  // خطای «Invalid Refresh Token» رو مستقیم توی کنسول سرور لاگ می‌کنه، حتی وقتی هیچ مشکلی
+  // برای کاربر پیش نمیاد (چون به‌درستی به‌عنوان مهمان در نظر گرفته می‌شه).
+  // این خطا رو اینجا صریحاً می‌گیریم، ساکت می‌کنیم و کوکی‌های خراب سوپابیس رو هم پاک می‌کنیم
+  // تا هم لاگ سرور تمیز بمونه و هم کاربر توی لوپ کوکی خراب گیر نکنه.
+  let user = null
+  try {
+    const { data, error } = await supabase.auth.getUser()
+
+    if (error) {
+      const isStaleTokenError =
+        error.code === 'refresh_token_not_found' ||
+        error.message?.toLowerCase().includes('refresh token')
+
+      // فقط خطاهای واقعاً غیرمنتظره رو لاگ کن، نه خطای عادی توکن منقضی/نامعتبر
+      if (!isStaleTokenError) {
+        console.error('proxy.ts - Auth error:', error.message)
+      }
+
+      // پاک کردن کوکی‌های خراب سوپابیس تا در ریکوئست‌های بعدی دوباره همین خطا تکرار نشه
+      request.cookies.getAll().forEach((cookie) => {
+        if (cookie.name.startsWith('sb-')) {
+          supabaseResponse.cookies.delete(cookie.name)
+        }
+      })
+    } else {
+      user = data.user
+    }
+  } catch (err) {
+    console.error('proxy.ts - Unexpected auth error:', err)
+  }
 
   const { pathname } = request.nextUrl
   const isProtectedRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.includes('employer') || pathname.includes('job-seeker');
